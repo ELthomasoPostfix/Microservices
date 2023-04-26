@@ -1,4 +1,4 @@
-# Webservices
+# Microservices
 
 This repo contains the code for the micro services assignment for the course Distributed Systems (INFORMAT 1500WETDIS) at the University of Antwerp in the academic year of 2022-2023. The author is Thomas Gueutal (s0195095).
 
@@ -8,13 +8,13 @@ The following major sections relate directly to the project's required features 
 * [Run the project](#running-the-project)
 * [Documentation](#documentation)
 
-Note that the role of the manual deliverable is filled by the [RESTful Design Considerations](#restful-design-considerations) section as wel as the [Documentation](#documentation) section.
+Note that the role of the manual deliverable is filled by the [Documentation](#documentation) section.
 
 # Project Specification
 
 The goal of this project is to decompose the given problem into separate micro services that communicate using RESTful APIs. This is done through the use of docker or podman.
 
-This section repeats the project requirements. This serves the double purpose of A) to thoroughly document the project and to allow in-code references to these requirements and deliverables and B) ensure I properly read and undestand the assignment.
+This section repeats the project requirements. This serves the double purpose of A) to thoroughly document the project and to allow in-code references to these requirements and deliverables and B) ensure I properly read and understand the assignment.
 
 The required features compose the given problem. They are to be grouped into several micro services, where graceful failure is always possible. The problem description and the subsequent requirements follow:
 
