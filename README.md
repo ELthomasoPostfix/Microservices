@@ -6,6 +6,7 @@ To skip to running the project, refer to [this section](#running-the-project).
 
 The following major sections relate directly to the project's required features and deliverables:
 * [Run the project](#running-the-project)
+* [Decomposition into Microservices](#decomposition-into-microservices)
 * [Documentation](#documentation)
 
 Note that the role of the manual deliverable is filled by the [Documentation](#documentation) section.
@@ -61,6 +62,34 @@ The following are additional notes on project submission
 # Running the project
 
 // TODO: Add run section
+
+# Decomposition into Microservices
+
+Microservice A:
+
+* profile creation/Registration
+* username & password combination verification/Login
+
+Microservice B:
+
+* A user can add other users as friends
+* The user can view a friends list
+
+Microservice C:
+
+* The user can create playlists
+* The user can add songs to a playlist
+* The user can view all songs in a playlist
+* The user can share a playlist with another user
+
+Microservice D:
+
+* Each user has a feed that lists the last N activities of its friends. (sorted
+by time) Activities are :
+   1. creating a playlist,
+   2. adding a song to a playlist,
+   3. making a friend
+   4. sharing a playlist with a friend.
 
 # Documentation
 
