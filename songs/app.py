@@ -1,11 +1,10 @@
 from flask import Flask
-from flask import request as flask_request
 from flask_restful import Resource, Api, reqparse
 import psycopg2
 
 parser = reqparse.RequestParser()
-parser.add_argument('title')
-parser.add_argument('artist')
+parser.add_argument('title', required=True, type=str, location=('args',), help="Required param: The title of a song")
+parser.add_argument('artist', required=True, type=str, location=('args',), help="Required param: The artist of a song")
 
 app = Flask("songs")
 api = Api(app)
@@ -37,7 +36,7 @@ def add_song(title, artist):
 
 def song_exists(title, artist):
     cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM songs (WHERE title = %s AND artist = %s);", (title, artist))
+    cur.execute("SELECT COUNT(*) FROM songs WHERE title = %s AND artist = %s;", (title, artist))
     return bool(cur.fetchone()[0])  # Either True or False
 
 class AllSongsResource(Resource):
@@ -46,12 +45,12 @@ class AllSongsResource(Resource):
 
 class SongExists(Resource):
     def get(self):
-        args = flask_request.args
+        args = parser.parse_args()
         return song_exists(args['title'], args['artist'])
 
 class AddSong(Resource):
     def put(self):
-        args = flask_request.args
+        args = parser.parse_args()
         return add_song(args['title'], args['artist'])
 
 api.add_resource(AllSongsResource, '/songs/')
