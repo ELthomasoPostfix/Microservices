@@ -1,2 +1,2 @@
 podman-compose down
-podman-compose up
+podman-compose up --build
