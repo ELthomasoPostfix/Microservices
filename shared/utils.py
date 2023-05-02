@@ -2,12 +2,15 @@ import psycopg2
 
 from flask import Flask
 from flask_restful import Api, reqparse
+from flask_apispec import FlaskApiSpec
 from typing import Tuple
+
+from shared.APIResponses import make_response_error, GenericResponseMessages as E_MSG
 
 from .config import config as shared_flask_app_config
 
 
-def create_app(app_name: str) -> Tuple[Flask, Api]:
+def create_app(app_name: str, apispec_config: dict) -> Tuple[Flask, Api, FlaskApiSpec]:
     """A generic Flask app factory that does general app setup.
 
     The app factory does not register any api endpoints.
@@ -17,11 +20,15 @@ def create_app(app_name: str) -> Tuple[Flask, Api]:
     # Do Flask app setup
     app = Flask(app_name)
     app.config.from_mapping(shared_flask_app_config)
+    app.config.from_mapping(apispec_config)
 
     # Do Flask RESTful api setup
     api = Api(app)
 
-    return app, api
+    # Do Swagger doc generation
+    docs = FlaskApiSpec(app)
+
+    return app, api, docs
 
 
 def retry_connect_until_success(db_name: str, user: str, password: str, host: str):
@@ -46,7 +53,7 @@ def retry_connect_until_success(db_name: str, user: str, password: str, host: st
             print("Retrying DB connection")
 
 
-def initialize_micro_service(microservice_name: str, db_host: str):
+def initialize_micro_service(microservice_name: str, db_host: str, apispec_config: dict):
     """Perform the necessary setup to initialize a micro service.
 
     :param microservice_name: The name of the microservice. Used to
@@ -54,13 +61,13 @@ def initialize_micro_service(microservice_name: str, db_host: str):
     :param db_host: The database host address
     :return: The major components of the microservice
     """
-    app, api = create_app(microservice_name)
+    app, api, docs = create_app(microservice_name, apispec_config)
 
     conn = retry_connect_until_success(db_name=microservice_name,
                                    user=app.config["POSTGRES_USER"],
                                    password=app.config["POSTGRES_PASSWORD"],
                                    host=db_host)
-    return app, api, conn
+    return app, api, docs, conn
 
 
 def to_params_type(python_builtin_cls) -> str:
