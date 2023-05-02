@@ -1,7 +1,8 @@
 from flask_apispec import MethodResource, doc
 
 from shared.utils import initialize_micro_service, marshal_with_flask_enforced
-from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_error, make_response_message
+from shared.exceptions import DoesNotExist, get_404_does_not_exist
+from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_message
 from schemas import AccountResponseSchema
 
 
@@ -46,9 +47,14 @@ class Account(MethodResource):
             res = curs.fetchone()
 
         if res == None:
-            return make_response_error(E_MSG.ERROR, "This resource does not exist", 404)
+            raise DoesNotExist(f"The user '{username}' does not exist")
 
         return make_response_message(E_MSG.SUCCESS, 200, username=res[0])
+
+
+@app.errorhandler(DoesNotExist)
+def handle_does_not_exist(e):
+    return get_404_does_not_exist(e)
 
 
 # Add resources
