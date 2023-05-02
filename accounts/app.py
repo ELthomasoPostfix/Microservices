@@ -1,9 +1,10 @@
-from flask_apispec import MethodResource, doc
+from flask_apispec import MethodResource, doc, use_kwargs
+from psycopg2.errors import UniqueViolation
 
 from shared.utils import initialize_micro_service, marshal_with_flask_enforced
-from shared.exceptions import DoesNotExist, get_404_does_not_exist
+from shared.exceptions import DoesNotExist, get_409_already_exists, get_404_does_not_exist
 from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_message
-from schemas import AccountResponseSchema
+from schemas import AccountResponseSchema, MicroservicesResponseSchema, RegisterBodySchema
 
 
 MICROSERVICE_NAME = "accounts"
@@ -51,10 +52,35 @@ class Account(MethodResource):
 
         return make_response_message(E_MSG.SUCCESS, 200, username=res[0])
 
+    @doc(description='Create an Account resource with the specified credentials', params={
+        'username': {'description': 'New account\'s username'},
+        'password': {'description': 'New account\'s password'}
+    })
+    @use_kwargs(RegisterBodySchema, location='form')
+    @marshal_with_flask_enforced(MicroservicesResponseSchema, code=201)
+    def post(self, username: str, **kwargs):
+        """The creation endpoint of an account.
+
+        :return: Whether the creation succeeded
+        """
+
+        password = kwargs["password"]
+
+        with conn.cursor() as curs:
+            curs.execute('INSERT INTO account ("username", "password") VALUES (%s, %s);', (username, password))
+            conn.commit()
+
+        return make_response_message(E_MSG.SUCCESS, 201)
+
 
 @app.errorhandler(DoesNotExist)
 def handle_does_not_exist(e):
     return get_404_does_not_exist(e)
+
+@app.errorhandler(UniqueViolation)
+def handle_db_unique_violation(e):
+    conn.rollback()
+    return get_409_already_exists(e)
 
 
 # Add resources
