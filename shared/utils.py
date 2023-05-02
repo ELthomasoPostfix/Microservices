@@ -78,6 +78,10 @@ def marshal_with_flask_enforced(schema, code='default', description='', inherit=
     This wrapper requires the type of all API responses to be flask.Response. Furthermore,
     their data must be json serializable.
 
+    If the response status code is 400 or greater (>= 400), then no marshalling or validation
+    is performed, and the flask.Response is simply passed up. This means that this decorator
+    is unsuited for use with a *code* parameter in the 400+ range.
+
     This wrapper condences the boilerplate of validating and marshalling all API response
     data into the correct format, using flask-apispec. Its use is recommended for the
     sake of elegance and, more importantly, avoiding code duplication while also somewhat
@@ -108,6 +112,10 @@ def marshal_with_flask_enforced(schema, code='default', description='', inherit=
         def add_missing_res(x: int, y: int):
             return make_response({ })
 
+        @marshal_with_flask_enforced(CalculatorResponseSchema, code=200)
+        def add_400s_plus_response(x: int, y: int):
+            return make_response({ "foo": "bar" }, 400)
+
     .. function:: add(x: int, y: int)
     .. function:: sub(x: int, y: int)
     In the previous code, calling :func:`add` would result in the following response body: ::
@@ -130,6 +138,13 @@ def marshal_with_flask_enforced(schema, code='default', description='', inherit=
             'message': 'Something went wrong'
         }
 
+    Calling :func:`add_400s_plus_response` would result in the following response body: ::
+
+        {
+            'foo': 'bar'
+        }
+
+
     :param schema: :class:`Schema <marshmallow.Schema>` class or instance, or `None`
     :param code: Optional HTTP response code
     :param description: Optional response description
@@ -151,13 +166,18 @@ def marshal_with_flask_enforced(schema, code='default', description='', inherit=
             # Call http method outside try; pass up
             # exceptions raised in http method transparantly
             to_marshal_result = http_method(*args, **kwargs)
+
+            if not isinstance(to_marshal_result, Response):
+                return make_response_error(E_MSG.ERROR, "All API responses must be flask.Response instances", 500)
+
+            if not to_marshal_result.is_json:
+                return make_response_error(E_MSG.ERROR, "All API response data must be json", 500)
+
+            # Skip marshalling and validation
+            if to_marshal_result.status_code >= 400:
+                return to_marshal_result
+
             try:
-                if not isinstance(to_marshal_result, Response):
-                    return make_response_error(E_MSG.ERROR, "All API responses must be flask.Response instances", 500)
-
-                if not to_marshal_result.is_json:
-                    return make_response_error(E_MSG.ERROR, "All API response data must be json", 500)
-
                 instance: Schema = schema()
                 content: dict = to_marshal_result.json
 
