@@ -148,9 +148,10 @@ def marshal_with_flask_enforced(schema, code='default', description='', inherit=
 
         @marshal_with(schema=schema, code=code, description=description, inherit=inherit, apply=apply)
         def wrapper(*args, **kwargs) -> Response:
+            # Call http method outside try; pass up
+            # exceptions raised in http method transparantly
+            to_marshal_result = http_method(*args, **kwargs)
             try:
-                to_marshal_result = http_method(*args, **kwargs)
-
                 if not isinstance(to_marshal_result, Response):
                     return make_response_error(E_MSG.ERROR, "All API responses must be flask.Response instances", 500)
 
