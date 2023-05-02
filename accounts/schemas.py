@@ -5,9 +5,6 @@ from shared.schemas import MicroservicesResponseSchema, MicroservicesResultSchem
 
 class AccountSchema(Schema):
     """The primary account information"""
-    id = fields.Integer(required=True, metadata={
-        'description': 'The unique identifier of the user',
-    })
     username = fields.String(required=True, metadata={
         'description': 'The username of the user',
     })

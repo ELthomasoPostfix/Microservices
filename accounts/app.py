@@ -1,8 +1,8 @@
 from flask_apispec import MethodResource, doc
 
 from shared.utils import initialize_micro_service, marshal_with_flask_enforced
-from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_message
-from schemas import AccountSchema
+from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_error, make_response_message
+from schemas import AccountResponseSchema
 
 
 MICROSERVICE_NAME = "accounts"
@@ -29,19 +29,26 @@ class Account(MethodResource):
 
         :return: The route string
         """
-        return f"/account/<int:account_id>"
+        return f"/account/<string:username>"
 
     @doc(description='Get a single Account resource, which represents primary information of a user\' account.', params={
-        'account_id': {'description': 'The internal id of the chosen account'}
+        'username': {'description': 'The username of the chosen account'}
     })
-    @marshal_with_flask_enforced(AccountSchema, code=200)
-    def get(self, account_id: int):
+    @marshal_with_flask_enforced(AccountResponseSchema, code=200)
+    def get(self, username: str):
         """The query endpoint of a specific account.
 
         :return: The primary account information
         """
 
-        return make_response_message(E_MSG.SUCCESS, 200, username="bob", id=account_id)
+        with conn.cursor() as curs:
+            curs.execute("SELECT * FROM account WHERE username = %s;", (username,))
+            res = curs.fetchone()
+
+        if res == None:
+            return make_response_error(E_MSG.ERROR, "This resource does not exist", 404)
+
+        return make_response_message(E_MSG.SUCCESS, 200, username=res[0])
 
 
 # Add resources
