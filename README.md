@@ -97,7 +97,9 @@ by time) Activities are :
 
 # Encountered Techinical Difficulties
 
-# Swagger VS APISpec
+# APISpec
+
+## Swagger VS APISpec Config
 
 The automatically generated API docs work based off of the `flask-apispec` python module. This module generates swagger documentation and serves an interactive instance of it at the specified endpoint. However, problems occur if you specifically configure your `flask` application with APISpec config. Take for example the following standalone code:
 
@@ -138,3 +140,26 @@ app.config.from_mapping({
     'APISPEC_VERSION': '1.0'
 })
 ```
+
+## 422 Unprocessable Entity
+
+Error handlers need to be defined to handle such errors. An example of such an error occurring is for the following call:
+
+```sh
+$ curl -X POST "http://127.0.0.1:5002/account/bob" -H "Content-Type: application/json" -d password=a
+<!doctype html>
+<html lang=en>
+<title>422 Unprocessable Entity</title>
+<h1>Unprocessable Entity</h1>
+<p>The request was well-formed but was unable to be followed due to semantic errors.</p>
+```
+
+## Flask Error Handlers
+
+To cleanly handle common exceptions thrown in multiple API endoints, `flask` error handlers are desirable. However, `flask-restful` overwrites the error handling facilities of `flask`. A quick and dirty fix that allows the use of `flask` error handlers again, is to simply ask `flask-restful` to propagate errors further up:
+
+```
+app.config['PROPAGATE_EXCEPTIONS'] = True
+```
+
+source: https://stackoverflow.com/questions/73336629/flask-error-handling-not-working-properly
