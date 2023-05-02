@@ -94,3 +94,47 @@ by time) Activities are :
 # Documentation
 
 // TODO: Add docs section
+
+# Encountered Techinical Difficulties
+
+# Swagger VS APISpec
+
+The automatically generated API docs work based off of the `flask-apispec` python module. This module generates swagger documentation and serves an interactive instance of it at the specified endpoint. However, problems occur if you specifically configure your `flask` application with APISpec config. Take for example the following standalone code:
+
+```py
+from flask import Flask
+from flask_apispec.extension import MarshmallowPlugin
+from apispec import APISpec
+
+app = Flask(__name__)
+
+app.config.from_mapping({
+    'APISPEC_SWAGGER_URL': '/swagger/',
+    'APISPEC_SWAGGER_UI_URL': '/swagger-ui/',
+    'APISPEC_SPEC': APISpec(
+        title='Accounts Microservice',
+        version='v1',
+        openapi_version='3.0.0',
+        plugins=(MarshmallowPlugin(),),
+    )
+})
+```
+
+This `/swagger-ui/` endpoint would serve a broken frontend, some components cannot be loaded and report: *Could not render this component, see the console*. This is because the `flask-apispec` module mixes swagger and openAPI specification rules. Because the documentation is also marked with an openAPI version instead of a swagger version, the frontend tries to interpret the documentation format as OpenAPI (?), which results in a broken frontend.
+
+Instead, ensure the API specification is marked as swagger documentation by configuring the `flask` app as follows:
+
+```py
+from flask import Flask
+
+app = Flask(__name__)
+
+MICROSERVICE_NAME = "accounts"
+DB_HOST = "accounts_persistence"
+app.config.from_mapping({
+    'APISPEC_SWAGGER_URL': '/swagger/',
+    'APISPEC_SWAGGER_UI_URL': '/swagger-ui/',
+    'APISPEC_TITLE': 'Accounts Microservice',
+    'APISPEC_VERSION': '1.0'
+})
+```
