@@ -1,9 +1,11 @@
 import psycopg2
 
-from flask import Flask
+from flask import Flask, Response
 from flask_restful import Api, reqparse
-from flask_apispec import FlaskApiSpec
-from typing import Tuple
+from flask_apispec import FlaskApiSpec, marshal_with
+from marshmallow import Schema, ValidationError
+from json import JSONDecodeError
+from typing import Tuple, Callable
 
 from shared.APIResponses import make_response_error, GenericResponseMessages as E_MSG
 
@@ -68,6 +70,110 @@ def initialize_micro_service(microservice_name: str, db_host: str, apispec_confi
                                    password=app.config["POSTGRES_PASSWORD"],
                                    host=db_host)
     return app, api, docs, conn
+
+
+def marshal_with_flask_enforced(schema, code='default', description='', inherit=None, apply=None):
+    """A convenience wrapper that enforces marshalling of loosely conformant response data.
+    
+    This wrapper requires the type of all API responses to be flask.Response. Furthermore,
+    their data must be json serializable.
+
+    This wrapper condences the boilerplate of validating and marshalling all API response
+    data into the correct format, using flask-apispec. Its use is recommended for the
+    sake of elegance and, more importantly, avoiding code duplication while also somewhat
+    enforcing a uniform return format in the case of response data validation errors.
+
+    Usage: ::
+
+        from flask import Flask, make_response
+        from marshmallow import Schema, fields
+    
+        app = Flask(__name__)
+
+        class CalculatorResponseSchema(Schema):
+            result = fields.Integer(required=True)
+            precision = fields.Integer()
+
+        @marshal_with_flask_enforced(CalculatorResponseSchema, code=200)
+        def add(x: int, y: int):
+            return make_response({ "result": x+y })
+
+        @marshal_with_flask_enforced(CalculatorResponseSchema, code=200)
+        def add_not_flask_response(x: int, y: int):
+            return {
+                "result": x+y
+            }
+
+        @marshal_with_flask_enforced(CalculatorResponseSchema, code=200)
+        def add_missing_res(x: int, y: int):
+            return make_response({ })
+
+    .. function:: add(x: int, y: int)
+    .. function:: sub(x: int, y: int)
+    In the previous code, calling :func:`add` would result in the following response body: ::
+
+        {
+            'result': 3
+        }
+    
+    Calling :func:`add_not_flask_response` would result in the following response body: ::
+
+        {
+            'error': 'All API responses must be flask.Response instances',
+            'message': 'Something went wrong'
+        }
+
+    Calling :func:`add_missing_res` would result in the following response body: ::
+
+        {
+            'error': "The response data does not follow the required scheme: {'result': ['Missing data for required field.']}",
+            'message': 'Something went wrong'
+        }
+
+    :param schema: :class:`Schema <marshmallow.Schema>` class or instance, or `None`
+    :param code: Optional HTTP response code
+    :param description: Optional response description
+    :param inherit: Inherit schemas from parent classes
+    :param apply: Marshal response with specified schema
+    :return: The decorator
+    """
+    def decorator(http_method: Callable):
+        """
+        The decorator is called instead of the wrapped
+        function, but flask restful expects the called
+        method to have an http verb (get, post, put,
+        delete, ...) as its name.
+        """
+        decorator.__name__ = http_method.__name__
+
+        @marshal_with(schema=schema, code=code, description=description, inherit=inherit, apply=apply)
+        def wrapper(*args, **kwargs) -> Response:
+            try:
+                to_marshal_result = http_method(*args, **kwargs)
+
+                if not isinstance(to_marshal_result, Response):
+                    return make_response_error(E_MSG.ERROR, "All API responses must be flask.Response instances", 500)
+
+                if not to_marshal_result.is_json:
+                    return make_response_error(E_MSG.ERROR, "All API response data must be json", 500)
+
+                instance: Schema = schema()
+                content: dict = to_marshal_result.json
+
+                # Validate content to match marshalling schema
+                instance.load(content)
+
+                # Convert content to ensure marshalling happens
+                to_marshal_result.data = instance.dumps(content)
+
+                return to_marshal_result
+            except ValidationError as e:
+                return make_response_error(E_MSG.ERROR, f"The response data does not follow the required scheme: {e}", 500)
+            except JSONDecodeError as e:
+                return make_response_error(E_MSG.ERROR, f"The response data is malformed", 500)
+
+        return wrapper
+    return decorator
 
 
 def to_params_type(python_builtin_cls) -> str:
