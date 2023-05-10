@@ -3,6 +3,8 @@ FROM python:3.8-slim-buster
 
 # Do microservice specific setup
 COPY accounts accounts
+RUN python3 -m venv venv
+RUN . venv/bin/activate
 RUN pip3 install -r accounts/requirements.txt
 
 # Do microservice shared setup
