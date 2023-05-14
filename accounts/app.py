@@ -12,7 +12,7 @@ DB_HOST = "accounts_persistence"
 APISPEC_CONFIG = {
     'APISPEC_SWAGGER_URL': '/swagger/',
     'APISPEC_SWAGGER_UI_URL': '/swagger-ui/',
-    'APISPEC_TITLE': 'Microservices',
+    'APISPEC_TITLE': 'Microservices Accounts',
     'APISPEC_VERSION': '1.0'
 }
 app, api, docs, conn = initialize_micro_service(MICROSERVICE_NAME, DB_HOST, APISPEC_CONFIG)
