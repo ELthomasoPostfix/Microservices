@@ -25,7 +25,7 @@ class DoesNotExist(DatabaseError):
 
 class AuthenticationError(Exception):
     """An error occurred concerning user authentication."""
-    code = 400
+    code = 401
     description = "Authentication failed"
 
 
