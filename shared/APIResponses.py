@@ -44,14 +44,14 @@ def make_response_error(message: str, error_message: str, status_code: int, **kw
         >>> response = make_response_error("Error", "Not implemented", 501)
         >>> response.json
         {
-            "message": "Success",
+            "message": "Error",
             "error": "Not implemented"
         }
 
         >>> response = make_response_error("Error", "Not implemented", 501, redirect="https://www.example.com")
         >>> response.json
         {
-            "message": "Success",
+            "message": "Error",
             "error": "Not implemented",
             "redirect: "https://www.example.com"
         }
