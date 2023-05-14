@@ -15,14 +15,22 @@ class AccountResponseSchema(MicroservicesResponseSchema, AccountSchema):
     pass
 
 
-class AccountsSchema(MicroservicesResultSchema):
-    result = fields.List(fields.Nested(AccountSchema), required=True, default=[], metadata={
-        'description': 'A list of Movie resources',
-    })
-
-
 class RegisterBodySchema(Schema):
     """The form body of an account registration"""
     password = fields.String(required=True, location='form', metadata={
         'description': 'The password to register the account with'
+    })
+
+
+class AuthenticationBodySchema(Schema):
+    """The form body of an account authentication"""
+    password = fields.String(required=True, location='form', metadata={
+        'description': 'The password to authenticate the account with'
+    })
+
+
+class AuthenticationResponseSchema(MicroservicesResponseSchema):
+    """The output format of the Authentication resource endpoint"""
+    authentication_data = fields.Boolean(required=True, metadata={
+        'description': 'The proof of authentication'
     })
