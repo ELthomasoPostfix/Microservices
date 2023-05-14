@@ -39,6 +39,8 @@ services:
     build:
       context: .
       dockerfile: ./accounts/
+    volumes:
+      - ./shared/:/shared:ro
     ports:
       - 5002:5000
     depends_on:
