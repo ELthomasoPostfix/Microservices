@@ -1,6 +1,8 @@
 version: "3.9"
 volumes:
   songs_data:  # Create a volume core_data that will contain the data for 'songs_persistence', such that when the container is stopped / crashes, the data remains.
+  accounts_data:
+  friends_data:
 services:
   songs_persistence:
     image: docker.io/postgres
@@ -28,6 +30,19 @@ services:
       # Map the psql data from the container to a virtual volume, thus preserving the data after the container is stopped.
       - accounts_data:/var/lib/postgresql/data
 
+  friends_persistence:
+    image: docker.io/postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres  # Can be any username & password combination, but we need to use the same combination in the code in 'songs'
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      # Map the friends_persistence folder to the docker-entrypoint-initdb.d folder in the container.
+      # This will ensure that the necessary files are present in the container for initializing the database(s)
+      - ./friends_persistence/:/docker-entrypoint-initdb.d
+      # Map the psql data from the container to a virtual volume, thus preserving the data after the container is stopped.
+      - friends_data:/var/lib/postgresql/data
+
   songs:
     build: ./songs
     ports:
@@ -45,6 +60,17 @@ services:
       - 5002:5000
     depends_on:
       - accounts_persistence
+
+  friends:
+    build:
+      context: .
+      dockerfile: ./friends/
+    volumes:
+      - ./shared/:/shared:ro
+    ports:
+      - 5003:5000
+    depends_on:
+      - friends_persistence
 
   gui:
     build: ./gui
