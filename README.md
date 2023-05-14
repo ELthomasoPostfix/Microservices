@@ -65,10 +65,29 @@ The following are additional notes on project submission
 
 # Decomposition into Microservices
 
-Microservice A:
+The following sections detail the decomposition of the project description into atomary microservices. But first, a short description of the available swagger documentation follows.
 
-* profile creation/Registration
-* username & password combination verification/Login
+## Swagger Docs
+
+Each microservice exposes interactive swagger documentation for its own RESTful API. Thus, the docs not accessible through one single URL. Below is a list of URLs that should provide access to the swagger docs for the implemented microservices, but each microservice should also specify their own doc urls:
+
+* **account**: http://127.0.0.1:5002/swagger-ui/
+
+## Accounts Microservice:
+
+Swagger docs urls:
+
+* http://127.0.0.1:5002/swagger-ui/
+* http://127.0.0.1:5002/swagger/
+
+Implemented requirements:
+
+1. profile creation/Registration
+2. username & password combination verification/Login
+
+This microservice is split up into two docker containers: `accounts` and `accounts_persistence`. The `accounts` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `accounts_persistence` container, which hosts a sql database that stores the following data:
+
+* A *account* table with all the username-password pairs, where the username must be unique
 
 Microservice B:
 
