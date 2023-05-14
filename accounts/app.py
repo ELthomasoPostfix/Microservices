@@ -46,6 +46,8 @@ class Account(MethodResource):
             curs.execute("SELECT * FROM account WHERE username = %s;", (username,))
             res = curs.fetchone()
 
+        # DoesNotExist exception response is handled
+        # by DoesNotExist error handler
         if res == None:
             raise DoesNotExist(f"The user '{username}' does not exist")
 
@@ -65,6 +67,8 @@ class Account(MethodResource):
 
         password = kwargs["password"]
 
+        # Duplicate username exception response is handled
+        # by UniqueViolation error handler
         with conn.cursor() as curs:
             curs.execute('INSERT INTO account ("username", "password") VALUES (%s, %s);', (username, password))
             conn.commit()
