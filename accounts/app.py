@@ -2,9 +2,9 @@ from flask_apispec import MethodResource, doc, use_kwargs
 from psycopg2.errors import UniqueViolation
 
 from shared.utils import initialize_micro_service, marshal_with_flask_enforced
-from shared.exceptions import DoesNotExist, get_409_already_exists, get_404_does_not_exist
+from shared.exceptions import DoesNotExist, get_409_already_exists, get_404_does_not_exist, get_401_authentication_error
 from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_message
-from schemas import AccountResponseSchema, MicroservicesResponseSchema, RegisterBodySchema
+from schemas import AccountResponseSchema, MicroservicesResponseSchema, RegisterBodySchema, AuthenticationBodySchema, AuthenticationResponseSchema
 
 
 MICROSERVICE_NAME = "accounts"
@@ -23,7 +23,6 @@ class Account(MethodResource):
 
     This resource supports the following project requirements
         1. account registration
-        2. verifying username & password match
     """
     @staticmethod
     def route() -> str:
@@ -33,7 +32,7 @@ class Account(MethodResource):
         """
         return f"/account/<string:username>"
 
-    @doc(description='Get a single Account resource, which represents primary information of a user\' account.', params={
+    @doc(description='Get a single Account resource, which represents primary information of a user\'s account.', params={
         'username': {'description': 'The username of the chosen account'}
     })
     @marshal_with_flask_enforced(AccountResponseSchema, code=200)
@@ -73,9 +72,52 @@ class Account(MethodResource):
         return make_response_message(E_MSG.SUCCESS, 201)
 
 
+class Authentication(MethodResource):
+    """The api endpoint that represents an Authentication resource.
+
+    An Authentication resource is an authenticating piece of data
+    that proves the posessor has been authenticated by the accounts
+    microservice.
+
+    This resource supports the following project requirements
+        2. verifying username & password match
+    """
+    @staticmethod
+    def route() -> str:
+        """Get the route to the Account resource.
+
+        :return: The route string
+        """
+        return f"/account/<string:username>/auth"
+
+    @doc(description='Get a single Authentication resource, which represents the proof of authentication of a user.', params={
+        'username': {'description': 'The username of the to authenticate account'},
+        'password': {'description': 'The password to authenticate with'}
+    })
+    @use_kwargs(AuthenticationBodySchema, location='form')
+    @marshal_with_flask_enforced(AuthenticationResponseSchema, code=200)
+    def post(self, username: str, **kwargs):
+        """The query endpoint of a single user's authentication flow.
+
+        :return: A proof of authentication
+        """
+
+        password = kwargs["password"]
+
+        with conn.cursor() as curs:
+            curs.execute("SELECT * FROM account WHERE username = %s AND password = %s;", (username, password))
+            res = curs.fetchone()
+
+        # Considers both existing and non-existing user
+        if res == None:
+            return get_401_authentication_error("username and password do not match", append_error=True, authentication_data=False)
+
+        return make_response_message(E_MSG.SUCCESS, 200, authentication_data=True)
+
+
 @app.errorhandler(DoesNotExist)
 def handle_does_not_exist(e):
-    return get_404_does_not_exist(e)
+    return get_404_does_not_exist(e, append_error=True)
 
 @app.errorhandler(UniqueViolation)
 def handle_db_unique_violation(e):
@@ -85,6 +127,8 @@ def handle_db_unique_violation(e):
 
 # Add resources
 api.add_resource(Account, Account.route())
+api.add_resource(Authentication, Authentication.route())
 
 # Register apispec docs
 docs.register(Account)
+docs.register(Authentication)
