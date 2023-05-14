@@ -28,7 +28,7 @@ small set of features implemented.
 1. profile creation/Registration
 2. username & password combination verification/Login
 3. A user can add other users as friends
-4. The user can view a friends list
+4. The user can view their friends list
 5. The user can create playlists
 6. The user can add songs to a playlist
 7. The user can view all songs in a playlist
@@ -69,9 +69,10 @@ The following sections detail the decomposition of the project description into 
 
 ## Swagger Docs
 
-Each microservice exposes interactive swagger documentation for its own RESTful API. Thus, the docs not accessible through one single URL. Below is a list of URLs that should provide access to the swagger docs for the implemented microservices, but each microservice should also specify their own doc urls:
+Each microservice exposes interactive swagger documentation for its own RESTful API. Thus, the docs not accessible through one single URL. Below is a list of URLs that should provide access to the swagger-ui docs for the implemented microservices, **once the microservices are running**, for easy access. But, each microservice should also specify their own doc urls:
 
 * **account**: http://127.0.0.1:5002/swagger-ui/
+* **friends**: http://127.0.0.1:5003/swagger-ui/
 
 ## Accounts Microservice:
 
@@ -89,10 +90,23 @@ This microservice is split up into two docker containers: `accounts` and `accoun
 
 * A *account* table with all the username-password pairs, where the username must be unique
 
-Microservice B:
+## Friends Microservice:
 
-* A user can add other users as friends
-* The user can view a friends list
+Swagger docs urls:
+
+* http://127.0.0.1:5003/swagger-ui/
+* http://127.0.0.1:5003/swagger/
+
+Implemented requirements:
+
+3. A user can add other users as friends
+4. The user can view a friends list
+
+This microservice is split up into two docker containers: `friends` and `friends_persistence`. The `friends` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `friends_persistence` container, which hosts a sql database that stores the following data:
+
+* A *friend* table with all the username-friendname pairs, where the username-friendname pair must be unique.
+
+Adding a friend is a one-way operation; it is *NOT* a binary operation. If `bob` adds `dylan` as a friend, then `dylan`'s friend list will remain unaltered. It is then still possible for `dylan` to add `bob` as a friend. The friend adding actions of either user are thus independent.
 
 Microservice C:
 
@@ -116,9 +130,9 @@ by time) Activities are :
 
 # Encountered Techinical Difficulties
 
-# APISpec
+## APISpec
 
-## Swagger VS APISpec Config
+### Swagger VS APISpec Config
 
 The automatically generated API docs work based off of the `flask-apispec` python module. This module generates swagger documentation and serves an interactive instance of it at the specified endpoint. However, problems occur if you specifically configure your `flask` application with APISpec config. Take for example the following standalone code:
 
@@ -182,3 +196,24 @@ app.config['PROPAGATE_EXCEPTIONS'] = True
 ```
 
 source: https://stackoverflow.com/questions/73336629/flask-error-handling-not-working-properly
+
+## SQL
+
+### Table-Level Unique Row Combinations
+
+The following design decisions are *NOT* part of the friends microservice any more. Instead, a friend relation goes one way; `bob` can add `dylan` as a friend, and `dylang` has to separately add `bob` as a friend
+
+The friends database potentially requires for a pair of usernames to be unique in the entire table, regardless of the order in which the two usernames are passed to the API. For example, inserting `('bob', 'dylan')` would be the same as inserting `('dylan', 'bob')`. Implementing such a constraint can be done in (at least?) two ways: a trigger or a check constraint.
+
+A trigger would be a more automatic way of handling any inserts on the friend table. It would also decrease the amount of error handling done in the python code, as unique violations would automatically be prevented. However, it would be an inefficient and overcomplicated solution to a simple problem.
+
+The second option is to require the usernames inserted into the table to be ordered, and for the inserted pair to be unique. The check constraint partially pushes the row uniqueness constraint to the database access code, by requiring the insert to sort the usernames.
+
+```sql
+CREATE TABLE friend (
+    username_1 TEXT NOT NULL,
+    username_2 TEXT NOT NULL,
+    CONSTRAINT unique_combination CHECK ( username_1 < username_2 ),
+    UNIQUE (username_1, username_2)
+);
+```
