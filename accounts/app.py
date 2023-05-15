@@ -1,8 +1,8 @@
 from flask_apispec import MethodResource, doc, use_kwargs
-from psycopg2.errors import UniqueViolation
+from psycopg2.errors import UniqueViolation, OperationalError, InterfaceError
 
 from shared.utils import initialize_micro_service, marshal_with_flask_enforced
-from shared.exceptions import DoesNotExist, get_409_already_exists, get_404_does_not_exist, get_401_authentication_error
+from shared.exceptions import DoesNotExist, get_409_already_exists, get_404_does_not_exist, get_401_authentication_error, get_500_database_error
 from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_message
 from schemas import AccountResponseSchema, MicroservicesResponseSchema, RegisterBodySchema, AuthenticationBodySchema, AuthenticationResponseSchema
 
@@ -127,6 +127,17 @@ def handle_does_not_exist(e):
 def handle_db_unique_violation(e):
     conn.rollback()
     return get_409_already_exists(e)
+
+@app.errorhandler(InterfaceError)
+@app.errorhandler(OperationalError)
+def handle_db_operational_error(e):
+    """An error handler for notifying the caller that
+    an exception occurred during database access.
+
+    Possible causes include: the persistence (db) container
+    being down, or errors during calls to the database.
+    """
+    return get_500_database_error(e)
 
 
 # Add resources
