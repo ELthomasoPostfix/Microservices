@@ -64,3 +64,15 @@ def get_401_authentication_error(e: Union[AuthenticationError, str], append_erro
     if append_error:
         error_msg += ", " + str(e)
     return make_response_error(E_MSG.ERROR, error_msg, AuthenticationError.code, **kwargs)
+
+def get_500_database_error(e: Union[DatabaseError, str], append_error: bool=False, **kwargs) -> Response:
+    """Make a `flask.Response` based on the DatabaseError exception class
+
+    :param e: The error to stringify and append to the error message, if append_error is True
+    :param append_error: Whether to append the exception string to the error message
+    :return: A `flask.Response` with error messages and the provided kwargs
+    """
+    error_msg: str = DatabaseError.description
+    if append_error:
+        error_msg += ", " + str(e)
+    return make_response_error(E_MSG.ERROR, error_msg, DatabaseError.code, **kwargs)
