@@ -4,7 +4,7 @@ from flask_apispec import MethodResource, doc
 from psycopg2.errors import UniqueViolation, OperationalError, InterfaceError
 
 from shared.utils import initialize_micro_service, marshal_with_flask_enforced
-from shared.exceptions import DoesNotExist, get_409_already_exists, get_404_does_not_exist, get_500_database_error
+from shared.exceptions import DoesNotExist, ConnectionError, get_409_already_exists, get_404_does_not_exist, get_500_database_error, get_502_bad_gateway_error
 from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_error, make_response_message
 from schemas import FriendResponseSchema, FriendsResponseSchema, MicroservicesResponseSchema
 
@@ -127,9 +127,13 @@ def require_user_exists(username: str) -> None:
 
     :param username: The username of the user to check existence of
     """
-    response = requests.get(f"http://accounts:5000/accounts/{username}")
-    if response.status_code != 200:
-        raise DoesNotExist(f"the user '{username}' does not exist")
+    try:
+        response = requests.get(f"http://accounts:5000/accounts/{username}")
+        if response.status_code != 200:
+            raise DoesNotExist(f"the user '{username}' does not exist")
+    # Explicitly set output values, to ensure graceful failure is handled appropriately
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        raise ConnectionError("could not reach the accounts microservice")
 
 
 @app.errorhandler(DoesNotExist)
@@ -151,6 +155,17 @@ def handle_db_operational_error(e):
     being down, or errors during calls to the database.
     """
     return get_500_database_error(e)
+
+@app.errorhandler(ConnectionError)
+def handle_db_connection_error(e):
+    """An error handler for notifying the caller that
+    an exception occurred during connection to another
+    microservice.
+
+    Possible causes include: the target microservice
+    container being down
+    """
+    return get_502_bad_gateway_error(e, append_error=True)
 
 
 # Add resources
