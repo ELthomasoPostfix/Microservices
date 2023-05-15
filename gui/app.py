@@ -67,7 +67,7 @@ def actual_login():
     success = False
 
     data = { "password": req_password }
-    response = requests.post(f"http://accounts:5000/account/{req_username}/auth", data=data)
+    response = requests.post(f"http://accounts:5000/accounts/{req_username}/auth", data=data)
     if response.status_code == 200:
         success = response.json().get("authentication_data", False)
 
@@ -104,7 +104,7 @@ def actual_register():
     success = False
 
     data = { "password": req_password }
-    response = requests.post(f"http://accounts:5000/account/{req_username}", data=data)
+    response = requests.post(f"http://accounts:5000/accounts/{req_username}", data=data)
     if response.status_code == 201:
         success = True
 

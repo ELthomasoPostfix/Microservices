@@ -30,7 +30,7 @@ class Account(MethodResource):
 
         :return: The route string
         """
-        return f"/account/<string:username>"
+        return "/accounts/<string:username>"
 
     @doc(description='Get a single Account resource, which represents primary information of a user\'s account.', params={
         'username': {'description': 'The username of the chosen account'}
@@ -92,7 +92,7 @@ class Authentication(MethodResource):
 
         :return: The route string
         """
-        return f"/account/<string:username>/auth"
+        return f"{Account.route()}/auth"
 
     @doc(description='Get a single Authentication resource, which represents the proof of authentication of a user.', params={
         'username': {'description': 'The username of the to authenticate account'},

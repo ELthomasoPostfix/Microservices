@@ -32,7 +32,7 @@ class Friends(MethodResource):
 
         :return: The route string
         """
-        return f"/friends/<string:username>"
+        return "/friends/<string:username>"
 
     @doc(description='Get the collection of Friend resources, which represents the friend list of a user.', params={
         'username': {'description': 'The username of the account to fetch the friend list of'}
@@ -127,7 +127,7 @@ def require_user_exists(username: str) -> None:
 
     :param username: The username of the user to check existence of
     """
-    response = requests.get(f"http://accounts:5000/account/{username}")
+    response = requests.get(f"http://accounts:5000/accounts/{username}")
     if response.status_code != 200:
         raise DoesNotExist(f"the user '{username}' does not exist")
 
