@@ -96,7 +96,7 @@ class Authentication(MethodResource):
 
     @doc(description='Get a single Authentication resource, which represents the proof of authentication of a user.', params={
         'username': {'description': 'The username of the to authenticate account'},
-        'password': {'description': 'The password to authenticate with'}
+        'password': {'description': 'The password to authenticate with', 'location': 'form'}
     })
     @use_kwargs(AuthenticationBodySchema, location='form')
     @marshal_with_flask_enforced(AuthenticationResponseSchema, code=200)
