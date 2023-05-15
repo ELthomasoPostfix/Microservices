@@ -41,7 +41,11 @@ def feed():
 
 @app.route("/catalogue")
 def catalogue():
-    songs = requests.get("http://songs:5000/songs").json()
+    try:
+        songs = requests.get("http://songs:5000/songs").json()
+    # Explicitly set output values, to ensure graceful failure is handled appropriately
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        songs = []
 
     return render_template('catalogue.html', username=username, password=password, songs=songs)
 
@@ -66,10 +70,14 @@ def actual_login():
     # ================================
     success = False
 
-    data = { "password": req_password }
-    response = requests.post(f"http://accounts:5000/accounts/{req_username}/auth", data=data)
-    if response.status_code == 200:
-        success = response.json().get("authentication_data", False)
+    try:
+        data = { "password": req_password }
+        response = requests.post(f"http://accounts:5000/accounts/{req_username}/auth", data=data)
+        if response.status_code == 200:
+            success = response.json().get("authentication_data", False)
+    # Explicitly set output values, to ensure graceful failure is handled appropriately
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        success = False
 
     save_to_session('success', success)
     if success:
@@ -103,10 +111,14 @@ def actual_register():
 
     success = False
 
-    data = { "password": req_password }
-    response = requests.post(f"http://accounts:5000/accounts/{req_username}", data=data)
-    if response.status_code == 201:
-        success = True
+    try:
+        data = { "password": req_password }
+        response = requests.post(f"http://accounts:5000/accounts/{req_username}", data=data)
+        if response.status_code == 201:
+            success = True
+    # Explicitly set output values, to ensure graceful failure is handled appropriately
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        success = False
 
     save_to_session('success', success)
 
@@ -133,13 +145,17 @@ def friends():
 
     if username is not None:
         friend_list = []
-        response = requests.get(f"http://friends:5000/friends/{username}")
-        if response.status_code == 200:
-            friend_list = [
-                friend_name
-                for friend_info in response.json().get("result", list())
-                if (friend_name := friend_info.get("friend_name", None)) is not None
-            ]
+        try:
+            response = requests.get(f"http://friends:5000/friends/{username}")
+            if response.status_code == 200:
+                friend_list = [
+                    friend_name
+                    for friend_info in response.json().get("result", list())
+                    if (friend_name := friend_info.get("friend_name", None)) is not None
+                ]
+        # Explicitly set output values, to ensure graceful failure is handled appropriately
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            friend_list = []
     else:
         friend_list = []
 
@@ -161,9 +177,13 @@ def add_friend():
 
     success = False
 
-    response = requests.post(f"http://friends:5000/friends/{username}/{req_username}")
-    if response.status_code == 201:
-        success = True
+    try:
+        response = requests.post(f"http://friends:5000/friends/{username}/{req_username}")
+        if response.status_code == 201:
+            success = True
+    # Explicitly set output values, to ensure graceful failure is handled appropriately
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        success = False
 
     save_to_session('success', success)
 
