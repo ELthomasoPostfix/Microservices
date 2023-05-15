@@ -65,7 +65,7 @@ The following are additional notes on project submission
 
 # Decomposition into Microservices
 
-The following sections detail the decomposition of the project description into atomary microservices. But first, a short description of the available swagger documentation follows.
+The following sections detail the decomposition of the project description into atomary microservices. But first, they are precluded by short descriptions of the available swagger documentation and some notes on graceful failure of microservices.
 
 ## Swagger Docs
 
@@ -73,6 +73,43 @@ Each microservice exposes interactive swagger documentation for its own RESTful 
 
 * **account**: http://127.0.0.1:5002/swagger-ui/
 * **friends**: http://127.0.0.1:5003/swagger-ui/
+
+## Graceful Failure
+
+It is desirable for errors due to unavailable microservice dependencies to be handled in a controlled manner. For this to be implemented in the assignment, two cases are considered.
+
+The first case entails exceptions occurring due to database access, between a flask server container and its corresponding postgres persistence container. Possible problems include erroneous database transactions or queries and the persistence container failing and going down. To counter these problems, each microservice should define an error handler for the `psycopg2.errors.OperationalError` and `psycopg2.errors.InterfaceError` exception classes. A minimal, flask-only example follows.
+
+```py
+from flask import Flask
+from psycopg2.errors import OperationalError
+
+app = Flask("microservice")
+
+@app.errorhandler(InterfaceError)
+@app.errorhandler(OperationalError)
+def handle_db_operational_error(e):
+    """Handle database access error or the persistence container being unavailable"""
+    return "Error during database access", 500
+```
+
+The second case pertains to a flask server container itself being down. For example, the container managing user accounts is depended on by many other microservices, due to their need for verifying a user's existence. If the container providing this service were to go down, then dependent microservices should still return an appropriate response. To resolve this case, all requests to microservices should take into account the possible timeout of the request, or for some other connection error to occur. A first, quite radical solution can be modeled similarly to the previous case. A simple python example for an alternate, less impactful solution follows. This second solution keeps the exception handling closer to the cause.
+
+```py
+success = False     # Default output value
+try:
+    response = requests.get("http://microservice:5000/resource/exists")
+    # Set output vars iff. expected, successful response code
+    if response.status_code == 200:
+        success = True
+# Explicitly set output values, to ensure graceful failure is handled appropriately
+except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+    success = False
+```
+
+In the above example, the url specifies a microservice named `microservice` accessible on port `5000`. The `/resource/exists` path, which is admittedly not a RESTful example, responds with a `200` code iff. the resource exists and no exception is raised within the callee. On success of the call, the output variable `success` is assigned. On an unexpected or erroneous status code, the default value of the output variable `success` is maintained. In case of a failed request call, a `requests.exceptions.Timeout` or `requests.exceptions.ConnectionError` exception occurs, then the output variable is explicitly set to a *failure* or default value. This way, the unavailability of microservice dependencies results in default output being generated regardless.
+
+Lastly, note that the `gui` flask app also implements this second precaution, as it has dependencies on all microservices.
 
 ## Accounts Microservice:
 
