@@ -133,8 +133,15 @@ def friends():
 
     if username is not None:
         friend_list = []
+        response = requests.get(f"http://friends:5000/friends/{username}")
+        if response.status_code == 200:
+            friend_list = [
+                friend_name
+                for friend_info in response.json().get("result", list())
+                if (friend_name := friend_info.get("friend_name", None)) is not None
+            ]
     else:
-        friend_list = []  # TODO: call
+        friend_list = []
 
     return render_template('friends.html', username=username, password=password, success=success, friend_list=friend_list)
 
@@ -152,7 +159,12 @@ def add_friend():
     global username
     req_username = request.form['username']
 
-    success = None  # TODO: call
+    success = False
+
+    response = requests.post(f"http://friends:5000/friends/{username}/{req_username}")
+    if response.status_code == 201:
+        success = True
+
     save_to_session('success', success)
 
     return redirect('/friends')
