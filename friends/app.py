@@ -1,9 +1,11 @@
-from flask_apispec import MethodResource, doc, use_kwargs
+import requests
+
+from flask_apispec import MethodResource, doc
 from psycopg2.errors import UniqueViolation
 
 from shared.utils import initialize_micro_service, marshal_with_flask_enforced
-from shared.exceptions import DoesNotExist, get_409_already_exists, get_404_does_not_exist, get_401_authentication_error
-from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_message
+from shared.exceptions import DoesNotExist, get_409_already_exists, get_404_does_not_exist
+from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_error, make_response_message
 from schemas import FriendResponseSchema, FriendsResponseSchema, MicroservicesResponseSchema
 
 
@@ -86,7 +88,7 @@ class Friend(MethodResource):
         # DoesNotExist exception response is handled
         # by DoesNotExist error handler
         if res == None:
-            raise DoesNotExist(f"The users '{username}' and '{friendname}' are not friends")
+            raise DoesNotExist(f"the users '{username}' and '{friendname}' are not friends")
 
         return make_response_message(E_MSG.SUCCESS, 200, friend_name=res[1])
 
@@ -101,6 +103,12 @@ class Friend(MethodResource):
         :return: The success or error message
         """
 
+        if username == friendname:
+            return make_response_error(E_MSG.ERROR, "A user cannot add themselves as a friend", 400)
+
+        require_user_exists(username)
+        require_user_exists(friendname)
+
         # Duplicate username-friendname exception response is handled
         # by UniqueViolation error handler
         with conn.cursor() as curs:
@@ -108,6 +116,20 @@ class Friend(MethodResource):
             conn.commit()
 
         return make_response_message(E_MSG.SUCCESS, 201)
+
+
+def require_user_exists(username: str) -> None:
+    """Require that the specified user exists according to
+    the accounts microservice.
+
+    Raise a DoesNotExist exception if the accounts microservice does
+    not return the expected, positive response.
+
+    :param username: The username of the user to check existence of
+    """
+    response = requests.get(f"http://accounts:5000/account/{username}")
+    if response.status_code != 200:
+        raise DoesNotExist(f"the user '{username}' does not exist")
 
 
 @app.errorhandler(DoesNotExist)

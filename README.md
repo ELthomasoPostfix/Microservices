@@ -108,6 +108,8 @@ This microservice is split up into two docker containers: `friends` and `friends
 
 Adding a friend is a one-way operation; it is *NOT* a binary operation. If `bob` adds `dylan` as a friend, then `dylan`'s friend list will remain unaltered. It is then still possible for `dylan` to add `bob` as a friend. The friend adding actions of either user are thus independent.
 
+Note that the POST `friends` API endpoints strictly require **EVERY** user target of the requests to exist. This means that a request to create a friend relationship from `bob` to `dylan` requires both `bob` *and* `dylan` to be existing users. Their existence is verified with the `accounts` microservice. The GET `friends` API endpoints on the other hand do not do any verification of the existence of the user targets for received requests. They do not make any alterations to the database, so they will simply resolve fetches of any non-existent resources to 404 reponses.
+
 Microservice C:
 
 * The user can create playlists
