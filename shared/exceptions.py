@@ -29,6 +29,12 @@ class AuthenticationError(Exception):
     description = "Authentication failed"
 
 
+class ConnectionError(Exception):
+    """An exception occurred while connecting to another microservice."""
+    code = 502
+    description = "Failed to connect to microservice"
+
+
 def get_409_already_exists(e: Union[AlreadyExists, str], append_error: bool=False, **kwargs) -> Response:
     """Make a `flask.Response` based on the AlreadyExists exception class
     
@@ -76,3 +82,15 @@ def get_500_database_error(e: Union[DatabaseError, str], append_error: bool=Fals
     if append_error:
         error_msg += ", " + str(e)
     return make_response_error(E_MSG.ERROR, error_msg, DatabaseError.code, **kwargs)
+
+def get_502_bad_gateway_error(e: Union[ConnectionError, str], append_error: bool=False, **kwargs) -> Response:
+    """Make a `flask.Response` based on the ConnectionError exception class
+
+    :param e: The error to stringify and append to the error message, if append_error is True
+    :param append_error: Whether to append the exception string to the error message
+    :return: A `flask.Response` with error messages and the provided kwargs
+    """
+    error_msg: str = ConnectionError.description
+    if append_error:
+        error_msg += ", " + str(e)
+    return make_response_error(E_MSG.ERROR, error_msg, ConnectionError.code, **kwargs)
