@@ -4,7 +4,7 @@ from flask_apispec import MethodResource, doc
 from psycopg2.errors import UniqueViolation, OperationalError, InterfaceError
 
 from shared.utils import initialize_micro_service, marshal_with_flask_enforced
-from shared.exceptions import DoesNotExist, ConnectionError, get_409_already_exists, get_404_does_not_exist, get_500_database_error, get_502_bad_gateway_error
+from shared.exceptions import DoesNotExist, MicroserviceConnectionError, get_409_already_exists, get_404_does_not_exist, get_500_database_error, get_502_bad_gateway_error
 from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_error, make_response_message
 from schemas import MicroservicesResponseSchema
 
@@ -41,7 +41,7 @@ def handle_db_operational_error(e):
     """
     return get_500_database_error(e)
 
-@app.errorhandler(ConnectionError)
+@app.errorhandler(MicroserviceConnectionError)
 def handle_db_connection_error(e):
     """An error handler for notifying the caller that
     an exception occurred during connection to another
