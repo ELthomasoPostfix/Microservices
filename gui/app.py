@@ -219,6 +219,19 @@ def playlists():
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
             my_playlists = []
 
+        try:
+            response = requests.get(f"http://playlists_sharing:5000/playlists/{username}/shared")
+            if response.status_code == 200:
+                shared_playlists = response.json().get("result", list())
+                shared_with_me = [
+                    (shared_playlist["id"], shared_playlist["title"])
+                    for shared_playlist in shared_playlists
+                    if "id" in shared_playlist and "title" in shared_playlist
+                ]
+        # Explicitly set output values, to ensure graceful failure is handled appropriately
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            shared_with_me = []
+
     return render_template('playlists.html', username=username, password=password, my_playlists=my_playlists, shared_with_me=shared_with_me)
 
 
@@ -297,7 +310,12 @@ def invite_user_to_playlist(playlist_id):
     # ================================
     recipient = request.form['user']
 
-    # TODO: call
+    try:
+        requests.post(f"http://playlists_sharing:5000/playlists/{recipient}/shared/{playlist_id}")
+    # Explicitly set output values, to ensure graceful failure is handled appropriately
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        pass    # No output value required
+
     return redirect(f'/playlists/{playlist_id}')
 
 
