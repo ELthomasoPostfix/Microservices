@@ -69,11 +69,14 @@ The following sections detail the decomposition of the project description into 
 
 ## Swagger Docs
 
-Each microservice exposes interactive swagger documentation for its own RESTful API. Thus, the docs not accessible through one single URL. Below is a list of URLs that should provide access to the swagger-ui docs for the implemented microservices, **once the microservices are running**, for easy access. But, each microservice should also specify their own doc urls:
+Each microservice exposes interactive swagger documentation for its own RESTful API. Thus, the docs not accessible through one single URL. Below is a list of URLs that should provide access to the swagger-ui docs for the implemented microservices, **once the microservices are running**, for easy access. But, each microservice should also specify their own doc urls.
 
-* **account**: http://127.0.0.1:5002/swagger-ui/
-* **friends**: http://127.0.0.1:5003/swagger-ui/
-* **playlists**: http://127.0.0.1:5004/swagger-ui/
+| Microservice      | url                               |
+| -                 | -                                 |
+| [accounts](#accounts-microservice)          | http://127.0.0.1:5002/swagger-ui/ |
+| [friends](#friends-microservice)           | http://127.0.0.1:5003/swagger-ui/ |
+| [playlists](#playlists-microservice)         | http://127.0.0.1:5004/swagger-ui/ |
+| [playlists sharing](#playlists-sharing-microservice) | http://127.0.0.1:5005/swagger-ui/ |
 
 ## Graceful Failure
 
@@ -126,7 +129,9 @@ Implemented requirements:
 
 This microservice is split up into two docker containers: `accounts` and `accounts_persistence`. The `accounts` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `accounts_persistence` container, which hosts a sql database that stores the following data:
 
-* A *account* table with all the username-password pairs, where the username must be unique
+* A *account* table with all the `(username, password)` pairs, where the `username` must be unique
+
+Passwords are stored in plaintext and not encrypted, hashed or treated in any way, neither in storage not in transport. The username of a user will function as the primary, unique identifier of the user in all other microservices.
 
 ## Friends Microservice:
 
@@ -142,7 +147,7 @@ Implemented requirements:
 
 This microservice is split up into two docker containers: `friends` and `friends_persistence`. The `friends` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `friends_persistence` container, which hosts a sql database that stores the following data:
 
-* A *friend* table with all the username-friendname pairs, where the username-friendname pair must be unique.
+* A *friend* table with all the `(username, friendname)` pairs, where the `(username, friendname)` pair must be unique.
 
 Adding a friend is a one-way operation; it is *NOT* a binary operation. If `bob` adds `dylan` as a friend, then `dylan`'s friend list will remain unaltered. It is then still possible for `dylan` to add `bob` as a friend. The friend adding actions of either user are thus independent.
 
@@ -165,8 +170,8 @@ Implemented requirements:
 
 This microservice is split up into two docker containers: `playlists` and `playlists_persistence`. The `playlists` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `playlists_persistence` container, which hosts a sql database that stores the following data:
 
-* A *playlist* table with all playlists specific information, where the owner_username-title pair must be unique.
-* A *playlist_song* table which maps playlists to songs, where playlist_id-song_artist-song_title tuple must be unique.
+* A *playlist* table with all playlists specific information, where the `(owner_username, title)` pair must be unique.
+* A *playlist_song* table which maps playlists to songs, where `(playlist_id, song_artist, song_title)` tuple must be unique.
 
 Note the particular structure of the API endpoints for the playlists microservice specially. The resources that make it up are ordered as follows, from most to least coarse grained: `Playlists > Playlist`.
 
@@ -182,9 +187,28 @@ The following paragraph does not reflect the current implementation, but serves 
 
 An alternate implementation could have split the updating of a playlist into a separate resource, `PlaylistSong`. Adding the extension functionality of an existing playlist as a PUT on the `Playlist` resource could be rejected in favour of adding a new `PlaylistSong` resource for two reasons. First, the song in a playlist could be considered a separate resource, whose creation via a POST would model updating the playlist. This is perhaps the more RESTful of the two solutions. Additionally, PUT should be idempotent. If it is desirable behavior for a "Resource Already Exists" error to be returned upon adding a song to a playlist it is already a part of, then the PUT implementation would be prohibitive.
 
-Microservice D:
+## Playlists Sharing Microservice:
 
-* The user can share a playlist with another user
+Swagger docs urls:
+
+* http://127.0.0.1:5005/swagger-ui/
+* http://127.0.0.1:5005/swagger/
+
+Implemented requirements:
+
+8. The user can share a playlist with another user
+
+This microservice is split up into two docker containers: `playlists_sharing` and `playlists_sharing_persistence`. The `playlists_sharing` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `playlists_sharing_persistence` container, which hosts a sql database that stores the following data:
+
+* A *playlist_share* table with all playlist sharing information, where the `(playlist_id, recipient_username)` pair must be unique. The recipient is the username of the recipient of the sharing action
+
+The playlist sharing feature has been consciously split from the [playlists microservice](#playlists-microservice) in favour of atomicity of services. This is analogous to the [accounts microservice](#accounts-microservice) being separate from the [friends microservice](#friends-microservice), in that a consumer app can still find out which playlists have been shared with a specific user even if the [playlists microservice](#playlists-microservice) is down. Though, without access to the proper [playlists microservice](#playlists-microservice), the reponse of the playlists sharing microservice would only specify a list of `(recipient, playlist_id)` tuples. The playlist title is not also included in this microservice due to its possibly mutable nature, so as to avoid data synchronization issues.
+
+The following two paragraphs explain the soft dependency of the playlist sharing microservice on the [playlists microservice](#playlists-microservice) in the context of attaching the playlist title to each shared playlist in the response.
+
+Of note is that the GET operations of the playlists sharing microservice will attempt to query the [playlists microservice](#playlists-microservice) to enrich their own responses. Consider the database contents of playlists sharing, which stores the minimally required sharing information: The recipient username and the playlist id. However, if the list of (or one singular) shared playlists is requested, it is likely that the caller also wants the corresponding playlist meta information, such as the playlist title. Hence the playlists sharing microservice always attempts to fetch the meta info for each shared playlist part of the GET responses; it somewhat acts as a proxy for the [playlists microservice](#playlists-microservice), except that works with shared playlists only.
+
+However, failing a fetch to the [playlists microservice](#playlists-microservice) is not seen as catastrophic. This simply means that for the failing playlist, only the basic sharing information found in the playlist sharing microservice itself is returned. Furthermore, the responses of the [playlists microservice](#playlists-microservice) are *NOT* used to validate whether the contents of the playlists sharing microservice database are valid. Suppose that the sharing database contains a row `('bob', 4)`, meaning playlist `4` was shared with user `bob`. If the [playlists microservice](#playlists-microservice) returns a `404 Not Found` for that playlist, then the playlist sharing microservice does not consider the implications for its data validity. Only simple inquiry success VS failure is considered for the purpose of populating the response with the fetched meta info in addition to the basic information it always responds with. That basic info being playlist id and recipient username.
 
 Microservice E:
 
