@@ -11,6 +11,8 @@ def require_user_exists(username: str) -> Union[requests.Response, None]:
 
     Raise a DoesNotExist exception if the accounts microservice does
     not return the expected, positive response.
+    Raise a MicroserviceConnectionError exception if connection to the
+    accounts microservice cannot be established.
 
     :param username: The username of the user to check existence of
     :return: The microservice response if no exception
@@ -31,6 +33,8 @@ def require_song_exists(artist: str, title: str) -> Union[requests.Response, Non
 
     Raise a DoesNotExist exception if the songs microservice does
     not return the expected, positive response.
+    Raise a MicroserviceConnectionError exception if connection to the
+    songs microservice cannot be established.
 
     :param artist: The artist of the song to check existence of
     :param title: The title of the song to check existence of
@@ -53,6 +57,8 @@ def require_playlist_exists(playlist_id: int) -> Union[requests.Response, None]:
 
     Raise a DoesNotExist exception if the playlists microservice does
     not return the expected, positive response.
+    Raise a MicroserviceConnectionError exception if connection to the
+    playlists microservice cannot be established.
 
     :param playlist_id: The unique identifier of the playlist to check existence of
     :return: The microservice response if no exception
