@@ -4,6 +4,7 @@ volumes:
   accounts_data:
   friends_data:
   playlists_data:
+  playlists_sharing_data:
 services:
   songs_persistence:
     image: docker.io/postgres
@@ -51,11 +52,24 @@ services:
       - POSTGRES_USER=postgres  # Can be any username & password combination, but we need to use the same combination in the code in 'songs'
       - POSTGRES_PASSWORD=postgres
     volumes:
-      # Map the friends_persistence folder to the docker-entrypoint-initdb.d folder in the container.
+      # Map the playlists_persistence folder to the docker-entrypoint-initdb.d folder in the container.
       # This will ensure that the necessary files are present in the container for initializing the database(s)
       - ./playlists_persistence/:/docker-entrypoint-initdb.d
       # Map the psql data from the container to a virtual volume, thus preserving the data after the container is stopped.
       - playlists_data:/var/lib/postgresql/data
+
+  playlists_sharing_persistence:
+    image: docker.io/postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres  # Can be any username & password combination, but we need to use the same combination in the code in 'songs'
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      # Map the playlists_sharing_persistence folder to the docker-entrypoint-initdb.d folder in the container.
+      # This will ensure that the necessary files are present in the container for initializing the database(s)
+      - ./playlists_sharing_persistence/:/docker-entrypoint-initdb.d
+      # Map the psql data from the container to a virtual volume, thus preserving the data after the container is stopped.
+      - playlists_sharing_data:/var/lib/postgresql/data
 
   songs:
     build: ./songs
@@ -96,6 +110,17 @@ services:
       - 5004:5000
     depends_on:
       - playlists_persistence
+
+  playlists_sharing:
+    build:
+      context: .
+      dockerfile: ./playlists_sharing/
+    volumes:
+      - ./shared/:/shared:ro
+    ports:
+      - 5005:5000
+    depends_on:
+      - playlists_sharing_persistence
 
   gui:
     build: ./gui
