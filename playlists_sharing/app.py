@@ -157,6 +157,8 @@ def extend_share_information(share_information: dict) -> None:
         response = require_playlist_exists(playlist_id)
         if response is None:
             return
+        if response.status_code != 200:
+            return
         response_json = response.json()
         share_information.update({
             "title": response_json.get("title", "")
