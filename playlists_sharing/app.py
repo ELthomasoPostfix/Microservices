@@ -2,10 +2,10 @@ from flask_apispec import MethodResource, doc, use_kwargs
 from psycopg2.errors import UniqueViolation, OperationalError, InterfaceError
 
 from shared.utils import initialize_micro_service, marshal_with_flask_enforced
-from shared.microserviceInteractions import require_user_exists, require_song_exists
+from shared.microserviceInteractions import require_user_exists, require_playlist_exists
 from shared.exceptions import DoesNotExist, MicroserviceConnectionError, get_409_already_exists, get_404_does_not_exist, get_500_database_error, get_502_bad_gateway_error
 from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_error, make_response_message
-from schemas import MicroservicesResponseSchema
+from schemas import MicroservicesResponseSchema, SharedPlaylistsResponseSchema, SharedPlaylistResponseSchema
 
 
 MICROSERVICE_NAME = "playlists_sharing"
@@ -18,6 +18,111 @@ APISPEC_CONFIG = {
 }
 app, api, docs, conn = initialize_micro_service(MICROSERVICE_NAME, DB_HOST, APISPEC_CONFIG)
 
+
+class SharedPlaylists(MethodResource):
+    """The api endpoint that represents a collection of Playlist resources shared with a recipient user.
+
+    This resource collection does not support any project requirements directly,
+    it ensures RESTfulness by making the URL hackable up the tree.
+    """
+    @staticmethod
+    def route() -> str:
+        """Get the route to the collection Playlist resources shared with a recipient user.
+
+        :return: The route string
+        """
+        return "/playlists/<string:recipient>/shared"
+
+    @doc(description='Get the collection of Playlist resources shared with a specified recipient user.', params={
+        'recipient': {'description': 'The username of the recipient user to fetch the list of shared with playlists of'},
+    })
+    @marshal_with_flask_enforced(SharedPlaylistsResponseSchema, code=200)
+    def get(self, recipient: str):
+        """The query endpoint of the collection of shared Playlist resources for a recipient user.
+
+        :return: The list of playlists shared with the recipient user
+        """
+
+        with conn.cursor() as curs:
+            curs.execute("SELECT * FROM playlist_share WHERE recipient_username = %s;", (recipient,))
+            res = [
+                {
+                    "recipient": playlist_share[0],
+                    "id": playlist_share[1],
+                }
+                for playlist_share in curs.fetchall()
+            ]
+
+        return make_response_message(E_MSG.SUCCESS, 200, result=res)
+
+
+class SharedPlaylist(MethodResource):
+    """The api endpoint that represents a single Playlist resources shared with a recipient user.
+
+    This resource supports the following project requirements
+        7. sharing playlists with another user
+    """
+    @staticmethod
+    def route() -> str:
+        """Get the route to the Playlist resource sharing information with a recipient user.
+
+        :return: The route string
+        """
+        return f"{SharedPlaylists.route()}/<int:playlist_id>"
+
+    @doc(description='Get the sharing information for a Playlist resource with a specified recipient user.', params={
+        'recipient': {'description': 'The username of the recipient user to fetch the specific playlist sharing information for'},
+        'playlist_id': {'description': 'The unique identifier of the playlist to fetch the sharing information for'},
+    })
+    @marshal_with_flask_enforced(SharedPlaylistResponseSchema, code=200)
+    def get(self, recipient: str, playlist_id: int):
+        """The query endpoint of the single Playlist resource's sharing information for a specified recipient user.
+
+        :return: The sharing information for the playlist and the recipient user
+        """
+
+        with conn.cursor() as curs:
+            curs.execute("SELECT * FROM playlist_share WHERE recipient_username = %s AND playlist_id = %s;", (recipient, playlist_id))
+            res = curs.fetchone()
+
+            # DoesNotExist exception response is handled
+            # by DoesNotExist error handler
+            if res == None:
+                raise DoesNotExist(f"no playlist with id '{playlist_id}' is shared with recipient '{recipient}'")
+
+        return make_response_message(E_MSG.SUCCESS, 200, recipient=res[0], id=res[1])
+
+    @doc(description='Share a Playlist resource with a specified recipient user.', params={
+        'recipient': {'description': 'The username of the recipient user to share the specific playlist with'},
+        'playlist_id': {'description': 'The unique identifier of the playlist to share'},
+    })
+    @marshal_with_flask_enforced(SharedPlaylistResponseSchema, code=200)
+    def post(self, recipient: str, playlist_id: int):
+        """The creation endpoint of the single Playlist resource's sharing information for a specified recipient user.
+
+        :return: The created sharing information for the playlist and the recipient user
+        """
+
+        require_user_exists(recipient)
+        response = require_playlist_exists(playlist_id)
+
+        if response is not None:
+            playlist = response.json()
+            if playlist.get("owner", None) == recipient:
+                return make_response_error(E_MSG.ERROR, "You cannot share a playlist with yourself", 400)
+
+        with conn.cursor() as curs:
+            curs.execute('INSERT INTO playlist_share ("recipient_username", "playlist_id") VALUES (%s, %s);', (recipient, playlist_id))
+            conn.commit()
+
+            curs.execute('SELECT * FROM playlist_share WHERE recipient_username = %s AND playlist_id = %s;', (recipient, playlist_id))
+            res = curs.fetchone()
+
+            # Echo back playlist share meta info to caller,
+            if res is None:
+                return make_response_error(E_MSG.ERROR, f"Failed to share playlist with id '{playlist_id}' with recipient '{recipient}'", 500)
+
+        return make_response_message(E_MSG.SUCCESS, 200, recipient=res[0], id=res[1])
 
 
 @app.errorhandler(DoesNotExist)
@@ -50,3 +155,12 @@ def handle_db_connection_error(e):
     container being down
     """
     return get_502_bad_gateway_error(e, append_error=True)
+
+
+# Add resources
+api.add_resource(SharedPlaylists, SharedPlaylists.route())
+api.add_resource(SharedPlaylist, SharedPlaylist.route())
+
+# Register apispec docs
+docs.register(SharedPlaylists)
+docs.register(SharedPlaylist)
