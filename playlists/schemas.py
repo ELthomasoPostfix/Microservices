@@ -21,7 +21,7 @@ class PlaylistSongBodySchema(Schema):
     artist = fields.String(required=True, location='form', metadata={
         'description': 'The artist of a song to add to a playlist',
     })
-    song_title = fields.String(required=True, location='form', metadata={
+    title = fields.String(required=True, location='form', metadata={
         'description': 'The title of a song to add to a playlist',
     })
 
@@ -37,6 +37,24 @@ class PlaylistSchema(Schema):
     title = fields.String(required=True, metadata={
         'description': 'The user-designated title of the playlist',
     })
+
+
+class PlaylistMetaBodySchema(Schema):
+    """A Playlist resource's creation information,
+    provided in a form body to be added to as a new playlist
+    """
+    title = fields.String(required=True, location='form', metadata={
+        'description': 'The user-designated title of the new playlist',
+    })
+
+
+class PlaylistMetaResponseSchema(MicroservicesResponseSchema, PlaylistSchema):
+    """The output format for a Playlist resource's meta information.
+    
+    This excludes the songs part of the playlist, and only details
+    general playlist information.
+    """
+    pass
 
 
 class PlaylistsResponseSchema(MicroservicesResultSchema):

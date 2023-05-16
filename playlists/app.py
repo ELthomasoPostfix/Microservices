@@ -4,8 +4,8 @@ from psycopg2.errors import UniqueViolation, OperationalError, InterfaceError
 from shared.utils import initialize_micro_service, marshal_with_flask_enforced
 from shared.microserviceInteractions import require_user_exists, require_song_exists
 from shared.exceptions import DoesNotExist, MicroserviceConnectionError, get_409_already_exists, get_404_does_not_exist, get_500_database_error, get_502_bad_gateway_error
-from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_message
-from schemas import MicroservicesResponseSchema, PlaylistResponseSchema, PlaylistsResponseSchema, PlaylistSongBodySchema
+from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_error, make_response_message
+from schemas import MicroservicesResponseSchema, PlaylistResponseSchema, PlaylistsResponseSchema, PlaylistSongBodySchema, PlaylistMetaResponseSchema, PlaylistMetaBodySchema
 
 
 MICROSERVICE_NAME = "playlists"
@@ -22,8 +22,8 @@ app, api, docs, conn = initialize_micro_service(MICROSERVICE_NAME, DB_HOST, APIS
 class Playlists(MethodResource):
     """The api endpoint that represents a collection of Playlist resources for the chosen user.
 
-    This resource supports no project requirements, it exists to make the
-    RESTful API hackable up the tree.
+    This resource supports the following project requirements
+        5. creating playlists
     """
     @staticmethod
     def route() -> str:
@@ -56,15 +56,47 @@ class Playlists(MethodResource):
 
         return make_response_message(E_MSG.SUCCESS, 200, result=res)
 
+    @doc(description='Create a new, empty Playlist resource.', params={
+        'username': {'description': 'The username of the owner of the new playlist'},
+        'title': {'description': 'The user-designated title of the new playlist'}
+    })
+    @use_kwargs(PlaylistMetaBodySchema, location='form')
+    @marshal_with_flask_enforced(PlaylistMetaResponseSchema, code=200)
+    def post(self, username: str, **kwargs):
+        """The creation endpoint of a new Playlist resource.
+
+        :return: The created playlist's meta information
+        """
+
+        title: str = kwargs["title"]
+
+        require_user_exists(username)
+
+        # Duplicate username-title exception response is handled
+        # by UniqueViolation error handler
+        with conn.cursor() as curs:
+            curs.execute('INSERT INTO playlist ("id", "owner_username", "title") VALUES (DEFAULT, %s, %s);', (username, title))
+            conn.commit()
+
+            curs.execute('SELECT * FROM playlist WHERE owner_username = %s AND title = %s;', (username, title))
+            res = curs.fetchone()
+
+            # Echo back playlist meta info to caller,
+            # plus the playlist id
+            if res is None:
+                return make_response_error(E_MSG.ERROR, f"Failed to create new playlist named '{title}' for user '{username}'", 500)
+
+        return make_response_message(E_MSG.SUCCESS, 201, id=res[0], owner=res[1], title=res[2])
+
 
 class Playlist(MethodResource):
-    """The api endpoint that represents a single Playlist resource.
+    """The api endpoint that represents a single existing Playlist resource.
 
     Note that while a playlist stores additional information related to
-    the playlist itself, it also acts as a collection of Song resources.
+    the playlist itself, it also acts as a collection of simplified Song resources.
 
     This resource supports the following project requirements
-        5. creating playlists
+        6. add a song to a playlist
         7. viewing all songs in a playlist
     """
     @staticmethod
@@ -73,27 +105,26 @@ class Playlist(MethodResource):
 
         :return: The route string
         """
-        return f"{Playlists.route()}/<string:title>"
+        return f"/playlists/<int:playlist_id>"
 
     @doc(description='Get a single Playlist resource, which represents a playlist of songs added by a user.', params={
-        'username': {'description': 'The username of the owner of the playlist'},
-        'title': {'description': 'The user-designated title of the playlist'}
+        'playlist_id': {'description': 'The unique identifier of the playlist'},
     })
     @marshal_with_flask_enforced(PlaylistResponseSchema, code=200)
-    def get(self, username: str, title: str):
+    def get(self, playlist_id: int):
         """The query endpoint of a specific playlist.
 
         :return: The specified playlist
         """
 
         with conn.cursor() as curs:
-            curs.execute("SELECT * FROM playlist WHERE owner_username = %s AND title = %s;", (username, title))
+            curs.execute("SELECT * FROM playlist WHERE id = %s;", (playlist_id,))
             res = curs.fetchone()
 
             # DoesNotExist exception response is handled
             # by DoesNotExist error handler
             if res == None:
-                raise DoesNotExist(f"the user '{username}' has no playlist by the title '{title}'")
+                raise DoesNotExist(f"no playlist with id '{playlist_id}' exists")
 
             playlist_id, playlist_owner, playlist_title = res
 
@@ -109,57 +140,33 @@ class Playlist(MethodResource):
         return make_response_message(E_MSG.SUCCESS, 200, id=playlist_id, owner=playlist_owner,
                                      title=playlist_title, result=res)
 
-    @doc(description='Create a new, empty Playlist resource.', params={
-        'username': {'description': 'The username of the owner of the new playlist'},
-        'title': {'description': 'The user-designated title of the new playlist'}
-    })
-    @marshal_with_flask_enforced(MicroservicesResponseSchema, code=200)
-    def post(self, username: str, title: str):
-        """The creation endpoint of a specific Playlist resource.
-
-        :return: The success or error message
-        """
-
-        require_user_exists(username)
-
-        # Duplicate username-title exception response is handled
-        # by UniqueViolation error handler
-        with conn.cursor() as curs:
-            curs.execute('INSERT INTO playlist ("id", "owner_username", "title") VALUES (DEFAULT, %s, %s);', (username, title))
-            conn.commit()
-
-        return make_response_message(E_MSG.SUCCESS, 201)
-
-    @doc(description='Update a Playlist resource\'s songs with new songs. Any songs already part of the playlist are silently ignored.', params={
-        'username': {'description': 'The username of the owner of the playlist'},
-        'title': {'description': 'The user-designated title of the playlist'},
+    @doc(description='Update a Playlist resource\'s songs with a new song. Any songs already part of the playlist are silently ignored.', params={
         'artist': {'description': 'The artist of the song to add to the playlist', 'location': 'form'},
-        'song_title': {'description': 'The title of the song to add to the playlist', 'location': 'form'},
+        'title': {'description': 'The title of the song to add to the playlist', 'location': 'form'},
     })
     @use_kwargs(PlaylistSongBodySchema, location='form')
     @marshal_with_flask_enforced(MicroservicesResponseSchema, code=200)
-    def put(self, username: str, title: str, **kwargs):
+    def put(self, playlist_id: int, **kwargs):
         """The update endpoint of a specific Playlist resource's contents.
 
         :return: The success or error message
         """
 
         song_artist = kwargs["artist"]
-        song_title = kwargs["song_title"]
+        song_title = kwargs["title"]
 
-        require_user_exists(username)
         require_song_exists(artist=song_artist, title=song_title)
 
         # Duplicate username-title exception response is handled
         # by UniqueViolation error handler
         with conn.cursor() as curs:
-            curs.execute("SELECT id from playlist WHERE owner_username = %s AND title = %s", (username, title))
+            curs.execute("SELECT id from playlist WHERE id = %s", (playlist_id,))
             res = curs.fetchone()
 
             # DoesNotExist exception response is handled
             # by DoesNotExist error handler
             if res == None:
-                raise DoesNotExist(f"the user '{username}' has no playlist by the title '{title}'")
+                raise DoesNotExist(f"no playlist with id '{playlist_id}' exists")
 
             playlist_id, = res
 
