@@ -73,6 +73,7 @@ Each microservice exposes interactive swagger documentation for its own RESTful 
 
 * **account**: http://127.0.0.1:5002/swagger-ui/
 * **friends**: http://127.0.0.1:5003/swagger-ui/
+* **playlists**: http://127.0.0.1:5004/swagger-ui/
 
 ## Graceful Failure
 
@@ -147,12 +148,29 @@ Adding a friend is a one-way operation; it is *NOT* a binary operation. If `bob`
 
 Note that the POST `friends` API endpoints strictly require **EVERY** user target of the requests to exist. This means that a request to create a friend relationship from `bob` to `dylan` requires both `bob` *and* `dylan` to be existing users. Their existence is verified with the `accounts` microservice. The GET `friends` API endpoints on the other hand do not do any verification of the existence of the user targets for received requests. They do not make any alterations to the database, so they will simply resolve fetches of any non-existent resources to 404 reponses.
 
-Microservice C:
+## Playlists Microservice:
 
-* The user can create playlists
-* The user can add songs to a playlist
-* The user can view all songs in a playlist
-* The user can share a playlist with another user
+Swagger docs urls:
+
+* http://127.0.0.1:5004/swagger-ui/
+* http://127.0.0.1:5004/swagger/
+
+Implemented requirements:
+
+5. The user can create playlists
+6. The user can add songs to a playlist
+7. The user can view all songs in a playlist
+
+This microservice is split up into two docker containers: `playlists` and `playlists_persistence`. The `playlists` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `playlists_persistence` container, which hosts a sql database that stores the following data:
+
+* A *playlist* table with all playlists specific information, where the owner_username-title pair must be unique.
+* A *playlist_song* table which maps playlists to songs, where playlist_id-song_artist-song_title tuple must be unique.
+
+Note the particular structure of the API endpoints for the playlists microservice specially. The resources that make it up are ordered as follows, from most to least coarse grained: `Playlists > Playlist`. The top-level `Playlists` resource supports the RESTfulness of the API by making the URI hackable up the tree. Next, `Playlist` supports the fetching of all songs in a playlist, the creation of an empty playlist and the extension of a playlist by adding more songs to it. It can be argued that a playlist is a single resource that transparently encapsulates a collection of simplified songs, meaning that an update of that collection's content is still RESTful, as it is simply updating a resource.
+
+The following paragraph does not reflect the current implementation, but serves to illustrate a design consideration.
+
+An alternate implementation could have split the updating of a playlist into a separate resource, `PlaylistSong`. Adding the extension functionality of an existing playlist as a PUT on the `Playlist` resource could be rejected in favour of adding a new `PlaylistSong` resource for two reasons. First, the song in a playlist could be considered a separate resource, whose creation via a POST would model updating the playlist. This is perhaps the more RESTful of the two solutions. Additionally, PUT should be idempotent. If it is desirable behavior for a "Resource Already Exists" error to be returned upon adding a song to a playlist it is already a part of, then the PUT implementation would be prohibitive.
 
 Microservice D:
 
@@ -215,7 +233,7 @@ app.config.from_mapping({
 
 ## 422 Unprocessable Entity
 
-Error handlers need to be defined to handle such errors. An example of such an error occurring is for the following call:
+Error handlers need to be defined to handle exceptions. An example of such an error occurring is for the following call:
 
 ```sh
 $ curl -X POST "http://127.0.0.1:5002/account/bob" -H "Content-Type: application/json" -d password=a
@@ -225,6 +243,8 @@ $ curl -X POST "http://127.0.0.1:5002/account/bob" -H "Content-Type: application
 <h1>Unprocessable Entity</h1>
 <p>The request was well-formed but was unable to be followed due to semantic errors.</p>
 ```
+
+Such an error may occur due to flask-apispec trying to format the form or path parameters into their corresponding variables in the API function. Meaning the path params would be placed in the function arguments and the form params into the kwargs function param. If the received param names do not match the expected ones, then the request is wellformed, but flask-apispec cannot resolve the parameters to the corresponding variables. 
 
 ## Flask Error Handlers
 
@@ -256,3 +276,25 @@ CREATE TABLE friend (
     UNIQUE (username_1, username_2)
 );
 ```
+
+### Auto-Incrementing Column
+
+To store playlists, a clean separation of playlist meta information from the playlist's contained songs makes for a more robust implementation. The postgresql sql dialect provides the [serial pseudo datatype](https://www.postgresql.org/docs/15/datatype-numeric.html#DATATYPE-SERIAL). Coupled with the `DEFAULT` keyword, autogenerated, unique ids can be selected:
+
+```postgresql
+CREATE TABLE people (
+    id SERIAL,
+    name TEXT
+);
+
+INSERT INTO people values
+    (DEFAULT, 'bob'),
+    (DEFAULT, 'tony')
+;
+```
+
+### Insert If Not Exists
+
+Note that I'm not sure which of the below two solutions will be the preferred solution, so do not try to infer from the following paragraph which solution was implemented. It simply documents an encountered choice.
+
+Implementing the playlists functionality to update a playlist can be done in two ways. First, add a separate resource to represent a single song part of a playlist and specify a POST method. Alternately, specify a PUT method on the `Playlist` resource and define the behavior to silently ignore duplicate inserts. For this second option to be viable, it is desirable to have some postgresql functionality available to write an "INSERT IF NOT EXISTS" type query. This [stack overflow post](https://stackoverflow.com/questions/4069718/postgres-insert-if-does-not-exist-already) provides some references.
