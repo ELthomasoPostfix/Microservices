@@ -18,3 +18,22 @@ def require_user_exists(username: str) -> None:
     # Explicitly set output values, to ensure graceful failure is handled appropriately
     except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
         raise MicroserviceConnectionError("could not reach the accounts microservice")
+
+def require_song_exists(artist: str, title: str) -> None:
+    """Require that the specified song exists according to
+    the songs microservice.
+
+    Raise a DoesNotExist exception if the songs microservice does
+    not return the expected, positive response.
+
+    :param artist: The artist of the song to check existence of
+    :param title: The title of the song to check existence of
+    """
+    try:
+        response = requests.get(f"http://songs:5000/songs/exist?artist={artist}&title={title}")
+        if response.status_code != 200 or not response.json():
+            raise DoesNotExist(f"the song with artist '{artist}' and title '{title}' does not exist")
+    # Explicitly set output values, to ensure graceful failure is handled appropriately
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        raise MicroserviceConnectionError("could not reach the songs microservice")
+
