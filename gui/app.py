@@ -204,8 +204,20 @@ def playlists():
         # Get all playlists you created and all playlist that are shared with you. (list of id, title pairs)
         # ================================
 
-        my_playlists = []  # TODO: call
+        my_playlists = []
         shared_with_me = []  # TODO: call
+
+        try:
+            response = requests.get(f"http://playlists:5000/playlists/{username}")
+            if response.status_code == 200:
+                my_playlists = [
+                    (playlist["id"], playlist["title"])
+                    for playlist in response.json().get("result", list())
+                    if "id" in playlist and "title" in playlist
+                ]
+        # Explicitly set output values, to ensure graceful failure is handled appropriately
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            my_playlists = []
 
     return render_template('playlists.html', username=username, password=password, my_playlists=my_playlists, shared_with_me=shared_with_me)
 
@@ -220,7 +232,12 @@ def create_playlist():
     global username
     title = request.form['title']
 
-    # TODO: call
+    try:
+        data = { "title": title }
+        requests.post(f"http://playlists:5000/playlists/{username}", data=data)
+    # Explicitly set output values, to ensure graceful failure is handled appropriately
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        pass    # No output value required
 
     return redirect('/playlists')
 
@@ -232,7 +249,20 @@ def a_playlist(playlist_id):
     #
     # List all songs within a playlist
     # ================================
-    songs = [] # TODO: call
+    songs = []
+
+    try:
+        response = requests.get(f"http://playlists:5000/playlists/{playlist_id}")
+        if response.status_code == 200:
+            songs = [
+                (song["title"], song["artist"])
+                for song in response.json().get("result", list())
+                if "title" in song and "artist" in song
+            ]
+    # Explicitly set output values, to ensure graceful failure is handled appropriately
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        songs = []
+
     return render_template('a_playlist.html', username=username, password=password, songs=songs, playlist_id=playlist_id)
 
 
@@ -245,7 +275,16 @@ def add_song_to_playlist(playlist_id):
     # ================================
     title, artist = request.form['title'], request.form['artist']
 
-    # TODO: call
+    try:
+        data = {
+            "artist": artist,
+            "title": title
+        }
+        requests.put(f"http://playlists:5000/playlists/{playlist_id}", data=data)
+    # Explicitly set output values, to ensure graceful failure is handled appropriately
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        pass    # No output value required
+
     return redirect(f'/playlists/{playlist_id}')
 
 
