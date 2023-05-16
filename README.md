@@ -69,7 +69,7 @@ The following sections detail the decomposition of the project description into 
 
 ## Swagger Docs
 
-Each microservice exposes interactive swagger documentation for its own RESTful API. Thus, the docs not accessible through one single URL. Below is a list of URLs that should provide access to the swagger-ui docs for the implemented microservices, **once the microservices are running**, for easy access. But, each microservice should also specify their own doc urls.
+Each microservice exposes interactive swagger documentation for its own RESTful API. Thus, the docs are not accessible through one single URL. Below is a list of URLs that should provide access to the swagger-ui docs for the implemented microservices, **once the microservices are running**, for easy access. But, each microservice should also specify their own doc urls in their decomposition section.
 
 | Microservice      | url                               |
 | -                 | -                                 |
@@ -127,6 +127,17 @@ Implemented requirements:
 1. profile creation/Registration
 2. username & password combination verification/Login
 
+<details style="background: #3B3B3B; padding: 10px; border-radius: 1rem;">
+  <summary>Detailed Implemented Requirements</summary>
+
+| Project Req Nr | API Resource class | HTTP method | URI |
+| :-:  | :-: | :-: | :- |
+| 1. | [Account](/accounts/app.py)        | POST | /accounts/\<username>      |
+| 2. | [Authentication](/accounts/app.py) | POST | /accounts/\<username>/auth |
+
+</details>
+<br>
+
 This microservice is split up into two docker containers: `accounts` and `accounts_persistence`. The `accounts` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `accounts_persistence` container, which hosts a sql database that stores the following data:
 
 * A *account* table with all the `(username, password)` pairs, where the `username` must be unique
@@ -144,6 +155,17 @@ Implemented requirements:
 
 3. A user can add other users as friends
 4. The user can view a friends list
+
+<details style="background: #3B3B3B; padding: 10px; border-radius: 1rem;">
+  <summary>Detailed Implemented Requirements</summary>
+
+| Project Req Nr | API Resource class | HTTP method | URI |
+| :-:  | :-: | :-: | :- |
+| 3. | [Friend](/friends/app.py)  | POST | /friends/\<username>/\<friendname> |
+| 4. | [Friends](/friends/app.py) | GET  | /friends/\<username>               |
+
+</details>
+<br>
 
 This microservice is split up into two docker containers: `friends` and `friends_persistence`. The `friends` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `friends_persistence` container, which hosts a sql database that stores the following data:
 
@@ -167,6 +189,18 @@ Implemented requirements:
 5. The user can create playlists
 6. The user can add songs to a playlist
 7. The user can view all songs in a playlist
+
+<details style="background: #3B3B3B; padding: 10px; border-radius: 1rem;">
+  <summary>Detailed Implemented Requirements</summary>
+
+| Project Req Nr | API Resource class | HTTP method | URI |
+| :-:  | :-: | :-: | :- |
+| 5.   | [Playlists](/playlists/app.py) | POST | /playlists/\<username>    |
+| 6.   | [Playlist](/playlists/app.py)  | PUT  | /playlists/\<playlist_id> |
+| 7.   | [Playlist](/playlists/app.py)  | GET  | /playlists/\<playlist_id> |
+
+</details>
+<br>
 
 This microservice is split up into two docker containers: `playlists` and `playlists_persistence`. The `playlists` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `playlists_persistence` container, which hosts a sql database that stores the following data:
 
@@ -197,6 +231,16 @@ Swagger docs urls:
 Implemented requirements:
 
 8. The user can share a playlist with another user
+
+<details style="background: #3B3B3B; padding: 10px; border-radius: 1rem;">
+  <summary>Detailed Implemented Requirements</summary>
+
+| Project Req Nr | API Resource class | HTTP method | URI |
+| :-:  | :-: | :-: | :- |
+| 8.   | [SharedPlaylist](/playlists_sharing/app.py) | POST | /playlists/\<recipient>/shared/\<playlist_id> |
+
+</details>
+<br>
 
 This microservice is split up into two docker containers: `playlists_sharing` and `playlists_sharing_persistence`. The `playlists_sharing` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `playlists_sharing_persistence` container, which hosts a sql database that stores the following data:
 
