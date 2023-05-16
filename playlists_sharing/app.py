@@ -1,11 +1,11 @@
-from flask_apispec import MethodResource, doc, use_kwargs
+from flask_apispec import MethodResource, doc
 from psycopg2.errors import UniqueViolation, OperationalError, InterfaceError
 
 from shared.utils import initialize_micro_service, marshal_with_flask_enforced
 from shared.microserviceInteractions import require_user_exists, require_playlist_exists
 from shared.exceptions import DoesNotExist, MicroserviceConnectionError, get_409_already_exists, get_404_does_not_exist, get_500_database_error, get_502_bad_gateway_error
 from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_error, make_response_message
-from schemas import MicroservicesResponseSchema, SharedPlaylistsResponseSchema, SharedPlaylistResponseSchema
+from schemas import SharedPlaylistsResponseSchema, SharedPlaylistResponseSchema
 
 
 MICROSERVICE_NAME = "playlists_sharing"
@@ -33,7 +33,7 @@ class SharedPlaylists(MethodResource):
         """
         return "/playlists/<string:recipient>/shared"
 
-    @doc(description='Get the collection of Playlist resources shared with a specified recipient user.', params={
+    @doc(description='Get the collection of Playlist resources shared with a specified recipient user. This endpoint will attempt to query the playlists microservice to add additional, optional information to each playlist share in its response.', params={
         'recipient': {'description': 'The username of the recipient user to fetch the list of shared with playlists of'},
     })
     @marshal_with_flask_enforced(SharedPlaylistsResponseSchema, code=200)
@@ -45,15 +45,18 @@ class SharedPlaylists(MethodResource):
 
         with conn.cursor() as curs:
             curs.execute("SELECT * FROM playlist_share WHERE recipient_username = %s;", (recipient,))
-            res = [
-                {
-                    "recipient": playlist_share[0],
-                    "id": playlist_share[1],
+            result = []
+            for recipient, playlist_id in curs.fetchall():
+                # The basic, required data for the playlist
+                # share microservice
+                playlist_share_info = {
+                        "recipient": recipient,
+                        "id": playlist_id,
                 }
-                for playlist_share in curs.fetchall()
-            ]
+                extend_share_information(playlist_share_info)
+                result.append(playlist_share_info)
 
-        return make_response_message(E_MSG.SUCCESS, 200, result=res)
+        return make_response_message(E_MSG.SUCCESS, 200, result=result)
 
 
 class SharedPlaylist(MethodResource):
@@ -70,7 +73,7 @@ class SharedPlaylist(MethodResource):
         """
         return f"{SharedPlaylists.route()}/<int:playlist_id>"
 
-    @doc(description='Get the sharing information for a Playlist resource with a specified recipient user.', params={
+    @doc(description='Get the sharing information for a Playlist resource with a specified recipient user. This endpoint will attempt to query the playlists microservice to add additional, optional information to its response.', params={
         'recipient': {'description': 'The username of the recipient user to fetch the specific playlist sharing information for'},
         'playlist_id': {'description': 'The unique identifier of the playlist to fetch the sharing information for'},
     })
@@ -90,7 +93,13 @@ class SharedPlaylist(MethodResource):
             if res == None:
                 raise DoesNotExist(f"no playlist with id '{playlist_id}' is shared with recipient '{recipient}'")
 
-        return make_response_message(E_MSG.SUCCESS, 200, recipient=res[0], id=res[1])
+            playlist_share_info = {
+                "recipient": res[0],
+                "id": res[1]
+            }
+            extend_share_information(playlist_share_info)
+
+        return make_response_message(E_MSG.SUCCESS, 200, **playlist_share_info)
 
     @doc(description='Share a Playlist resource with a specified recipient user.', params={
         'recipient': {'description': 'The username of the recipient user to share the specific playlist with'},
@@ -123,6 +132,37 @@ class SharedPlaylist(MethodResource):
                 return make_response_error(E_MSG.ERROR, f"Failed to share playlist with id '{playlist_id}' with recipient '{recipient}'", 500)
 
         return make_response_message(E_MSG.SUCCESS, 200, recipient=res[0], id=res[1])
+
+
+def extend_share_information(share_information: dict) -> None:
+    """Attempt to fetch detailed playlist properties to enrich the playlist share response.
+
+    The *share_information* MUST contain a 'id' key that maps to the
+    playlist id to query the playlists API for.
+
+    The playlists microservice is queried for the detailed playlist
+    information needed to enrich the response. In case no valid,
+    successful reply is received, the basic share information does
+    not get updated.
+
+    This function catches all errors emitted during the querying of
+    the playlist microservice.
+
+    :param share_information: The basic share information to update
+    """
+    assert "id" in share_information, "The basic share information should contain the playlist id"
+
+    try:
+        playlist_id = share_information["id"]
+        response = require_playlist_exists(playlist_id)
+        if response is None:
+            return
+        response_json = response.json()
+        share_information.update({
+            "title": response_json.get("title", "")
+        })
+    except (DoesNotExist, MicroserviceConnectionError):
+        pass
 
 
 @app.errorhandler(DoesNotExist)

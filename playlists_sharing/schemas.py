@@ -12,7 +12,18 @@ class SharedPlaylistSchema(Schema):
     })
 
 
-class SharedPlaylistResponseSchema(MicroservicesResponseSchema, SharedPlaylistSchema):
+class SharedPlaylistExtendedSchema(SharedPlaylistSchema):
+    """Detailed shared Playlist resource properties that are fetched.
+
+    The playlist sharing microservice can attempt to extend the basic
+    sharing information it provides to include detailed playlist info.
+    """
+    title = fields.String(required=False, default="N/A", metadata={
+        'description': 'The user-designated title of the playlist',
+    })
+
+
+class SharedPlaylistResponseSchema(MicroservicesResponseSchema, SharedPlaylistExtendedSchema):
     """The output format of the Playlist resource sharing endpoint"""
     pass
 
@@ -20,6 +31,6 @@ class SharedPlaylistResponseSchema(MicroservicesResponseSchema, SharedPlaylistSc
 
 class SharedPlaylistsResponseSchema(MicroservicesResultSchema):
     """The output format of the Playlist resource sharing collection endpoint"""
-    result = fields.List(fields.Nested(SharedPlaylistSchema), required=True, default=[], metadata={
+    result = fields.List(fields.Nested(SharedPlaylistExtendedSchema), required=True, default=[], metadata={
         'description': 'The list of playlists shared with a recipient user',
     })
