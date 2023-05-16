@@ -146,7 +146,9 @@ This microservice is split up into two docker containers: `friends` and `friends
 
 Adding a friend is a one-way operation; it is *NOT* a binary operation. If `bob` adds `dylan` as a friend, then `dylan`'s friend list will remain unaltered. It is then still possible for `dylan` to add `bob` as a friend. The friend adding actions of either user are thus independent.
 
-Note that the POST `friends` API endpoints strictly require **EVERY** user target of the requests to exist. This means that a request to create a friend relationship from `bob` to `dylan` requires both `bob` *and* `dylan` to be existing users. Their existence is verified with the `accounts` microservice. The GET `friends` API endpoints on the other hand do not do any verification of the existence of the user targets for received requests. They do not make any alterations to the database, so they will simply resolve fetches of any non-existent resources to 404 reponses.
+Note that the POST `friends` API endpoints strictly require **EVERY** user target of the requests to exist. This means that a request to create a friend relationship from `bob` to `dylan` requires both `bob` *and* `dylan` to be existing users. Their existence is verified with the [accounts microservice](#accounts-microservice).
+
+The GET `friends` API endpoints on the other hand do not do any verification of the existence of the user targets for received requests. They rely on the state altering endpoints to do their due diligence, and just provide the stored data. This is done as a form of graceful failure and failure tolerance. If the depended on microservices that store related resources and facilitate the creation and update of friend resources are down, the friends microservice can still provide parts of its service normally. Namely, the friendship relations can still be queried.
 
 ## Playlists Microservice:
 
@@ -166,7 +168,15 @@ This microservice is split up into two docker containers: `playlists` and `playl
 * A *playlist* table with all playlists specific information, where the owner_username-title pair must be unique.
 * A *playlist_song* table which maps playlists to songs, where playlist_id-song_artist-song_title tuple must be unique.
 
-Note the particular structure of the API endpoints for the playlists microservice specially. The resources that make it up are ordered as follows, from most to least coarse grained: `Playlists > Playlist`. The top-level `Playlists` resource supports the RESTfulness of the API by making the URI hackable up the tree. Next, `Playlist` supports the fetching of all songs in a playlist, the creation of an empty playlist and the extension of a playlist by adding more songs to it. It can be argued that a playlist is a single resource that transparently encapsulates a collection of simplified songs, meaning that an update of that collection's content is still RESTful, as it is simply updating a resource.
+Note the particular structure of the API endpoints for the playlists microservice specially. The resources that make it up are ordered as follows, from most to least coarse grained: `Playlists > Playlist`.
+
+The top-level `Playlists` resource supports the RESTfulness of the API by making the URI hackable up the tree. It allows retrieval of all playlists that belong to a user, as well as creation of a playlist by a user. This creation step happens with a POST that contains the song title in the request body. RESTfulness is maintained, as POSTing to a collection of resources implicitly specifies the, for now non-existent, target resource. At the time of creation it is impossible to explicitly refer to the resource by its unique URI, `playlists/<int:playlist_id>`, because the resource does not exist at that time.
+
+Next, `Playlist` supports the fetching of all songs in a playlist and the extension of a playlist by adding a new song to it. It can be argued that a playlist is a single resource that transparently encapsulates a collection of simplified songs, meaning that an update of that collection's content is still RESTful, as it is simply updating a resource.
+
+It is worth highlighting that both the playlist creation (POST) and playlist update (PUT) strictly require the existence of some resources related to the target resource. Playlist creation requires the owner of the playlist to exist, for the playlist to be created. It verifies this with the [accounts microservice](#accounts-microservice). The update functionality requires for the song's artist-title combination to constitute an existing song. It verifies this with the provided [songs microservice](#songs-microservice). It does *NOT* check whether the owner of the playlist still exists. This responsibility lies with the playlist creation process and is considered fulfilled as long as it is checked at the time of playlist creation. Note that songs are marked `ON DELETE CASCADE`, so deleting a playlist if the owner were deleted would ensure a valid database state.
+
+The endpoints that make persistent changes to the playlists database perform existence checks for related resources. The GET/fetch endpoints do no such thing. They rely on the state altering endpoints to do their due diligence, and just provide the stored data. This is done as a form of graceful failure and failure tolerance. If the depended on microservices that store related resources and facilitate the creation and update of playlist resources are down, the playlists microservice can still provide parts of its service normally. Namely, the playlists of a user can still be queried.
 
 The following paragraph does not reflect the current implementation, but serves to illustrate a design consideration.
 
@@ -174,12 +184,20 @@ An alternate implementation could have split the updating of a playlist into a s
 
 Microservice D:
 
+* The user can share a playlist with another user
+
+Microservice E:
+
 * Each user has a feed that lists the last N activities of its friends. (sorted
 by time) Activities are :
    1. creating a playlist,
    2. adding a song to a playlist,
    3. making a friend
    4. sharing a playlist with a friend.
+
+## Songs Microservice:
+
+The songs microservice was provided to us at the start of the assignment. It stores artist-title combinations that represent songs.
 
 # Documentation
 
