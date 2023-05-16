@@ -17,7 +17,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "playlists" <<-EOSQ
         playlist_id SERIAL,
         song_artist TEXT NOT NULL,
         song_title TEXT NOT NULL,
-        FOREIGN KEY (playlist_id) REFERENCES playlist(id),
+        FOREIGN KEY (playlist_id) REFERENCES playlist(id) ON DELETE CASCADE,
         UNIQUE (playlist_id, song_artist, song_title)
     );
 EOSQL
