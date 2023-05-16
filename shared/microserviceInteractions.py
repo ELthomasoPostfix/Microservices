@@ -37,3 +37,20 @@ def require_song_exists(artist: str, title: str) -> None:
     except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
         raise MicroserviceConnectionError("could not reach the songs microservice")
 
+def require_playlist_exists(playlist_id: int) -> None:
+    """Require that the specified playlist exists according to
+    the playlists microservice.
+
+    Raise a DoesNotExist exception if the playlists microservice does
+    not return the expected, positive response.
+
+    :param playlist_id: The unique identifier of the playlist to check existence of
+    """
+    try:
+        response = requests.get(f"http://playlists:5000/playlists/{playlist_id}")
+        if response.status_code != 200:
+            raise DoesNotExist(f"the playlist with id '{playlist_id}' does not exist")
+    # Explicitly set output values, to ensure graceful failure is handled appropriately
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        raise MicroserviceConnectionError("could not reach the playlists microservice")
+
