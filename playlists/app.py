@@ -49,7 +49,8 @@ class Playlists(MethodResource):
                 {
                     "id": playlist[0],
                     "owner": playlist[1],
-                    "title": playlist[2]
+                    "title": playlist[2],
+                    "created": playlist[3].isoformat()
                 }
                 for playlist in curs.fetchall()
             ]
@@ -86,7 +87,7 @@ class Playlists(MethodResource):
             if res is None:
                 return make_response_error(E_MSG.ERROR, f"Failed to create new playlist named '{title}' for user '{username}'", 500)
 
-        return make_response_message(E_MSG.SUCCESS, 201, id=res[0], owner=res[1], title=res[2])
+        return make_response_message(E_MSG.SUCCESS, 201, id=res[0], owner=res[1], title=res[2], created=res[3].isoformat())
 
 
 class Playlist(MethodResource):
@@ -126,19 +127,20 @@ class Playlist(MethodResource):
             if res == None:
                 raise DoesNotExist(f"no playlist with id '{playlist_id}' exists")
 
-            playlist_id, playlist_owner, playlist_title = res
+            playlist_id, playlist_owner, playlist_title, playlist_created = res
 
             curs.execute("SELECT * FROM playlist_song WHERE playlist_id = %s;", (playlist_id,))
             res = [
                 {
                     "artist": playlist_song[1],
-                    "title": playlist_song[2]
+                    "title": playlist_song[2],
+                    "created": playlist_song[3].isoformat()
                 }
                 for playlist_song in curs.fetchall()
             ]
 
         return make_response_message(E_MSG.SUCCESS, 200, id=playlist_id, owner=playlist_owner,
-                                     title=playlist_title, result=res)
+                                     title=playlist_title, created=playlist_created.isoformat(), result=res)
 
     @doc(description='Update a Playlist resource\'s songs with a new song. Any songs already part of the playlist are silently ignored.', params={
         'artist': {'description': 'The artist of the song to add to the playlist', 'location': 'form'},
@@ -168,7 +170,7 @@ class Playlist(MethodResource):
             if res == None:
                 raise DoesNotExist(f"no playlist with id '{playlist_id}' exists")
 
-            playlist_id, = res
+            playlist_id = res
 
             # Silenty ignore unique violations, to satisfy the idempotency of PUT
             curs.execute('INSERT INTO playlist_song ("playlist_id", "song_artist", "song_title") VALUES (%s, %s, %s) ON CONFLICT DO NOTHING;', (playlist_id, song_artist, song_title))

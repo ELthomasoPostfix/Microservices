@@ -11,6 +11,9 @@ class PlaylistSongSchema(Schema):
     title = fields.String(required=True, metadata={
         'description': 'The title of a song part of a playlist',
     })
+    created = fields.DateTime(format="iso", required=True, metadata={
+        'description': 'The ISO8601 date time at which the song was added to the playlist'
+    })
 
 
 class PlaylistSongBodySchema(Schema):
@@ -35,6 +38,9 @@ class PlaylistSchema(Schema):
     })
     title = fields.String(required=True, metadata={
         'description': 'The user-designated title of the playlist',
+    })
+    created = fields.DateTime(format="iso", required=True, metadata={
+        'description': 'The ISO8601 date time at which the playlist was created'
     })
 
 
