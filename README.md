@@ -115,6 +115,10 @@ In the above example, the url specifies a microservice named `microservice` acce
 
 Lastly, note that the `gui` flask app also implements this second precaution, as it has dependencies on all microservices.
 
+## Songs Microservice:
+
+The songs microservice was provided to us at the start of the assignment. It stores artist-title combinations that represent songs.
+
 ## Accounts Microservice:
 
 Swagger docs urls:
@@ -282,10 +286,6 @@ by time) Activities are :
    2. adding a song to a playlist,
    3. making a friend
    4. sharing a playlist with a friend.
-
-## Songs Microservice:
-
-The songs microservice was provided to us at the start of the assignment. It stores artist-title combinations that represent songs.
 
 # Documentation
 
