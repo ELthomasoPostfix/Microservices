@@ -138,7 +138,7 @@ Implemented requirements:
 </details>
 <br>
 
-This microservice is split up into two docker containers: `accounts` and `accounts_persistence`. The `accounts` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `accounts_persistence` container, which hosts a sql database that stores the following data:
+This microservice is split up into two docker containers: `accounts` and `accounts_persistence`. The `accounts` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `accounts_persistence` container, which hosts a [sql database](/accounts_persistence/init.sh) that stores the following data:
 
 * A *account* table with all the `(username, password)` pairs, where the `username` must be unique
 
@@ -167,7 +167,7 @@ Implemented requirements:
 </details>
 <br>
 
-This microservice is split up into two docker containers: `friends` and `friends_persistence`. The `friends` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `friends_persistence` container, which hosts a sql database that stores the following data:
+This microservice is split up into two docker containers: `friends` and `friends_persistence`. The `friends` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `friends_persistence` container, which hosts a [sql database](/friends_persistence/init.sh) that stores the following data:
 
 * A *friend* table with all the `(username, friendname)` pairs, where the `(username, friendname)` pair must be unique.
 
@@ -202,7 +202,7 @@ Implemented requirements:
 </details>
 <br>
 
-This microservice is split up into two docker containers: `playlists` and `playlists_persistence`. The `playlists` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `playlists_persistence` container, which hosts a sql database that stores the following data:
+This microservice is split up into two docker containers: `playlists` and `playlists_persistence`. The `playlists` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `playlists_persistence` container, which hosts a [sql database](/playlists_persistence/init.sh) that stores the following data:
 
 * A *playlist* table with all playlists specific information, where the `(owner_username, title)` pair must be unique.
 * A *playlist_song* table which maps playlists to songs, where `(playlist_id, song_artist, song_title)` tuple must be unique.
@@ -242,7 +242,7 @@ Implemented requirements:
 </details>
 <br>
 
-This microservice is split up into two docker containers: `playlists_sharing` and `playlists_sharing_persistence`. The `playlists_sharing` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `playlists_sharing_persistence` container, which hosts a sql database that stores the following data:
+This microservice is split up into two docker containers: `playlists_sharing` and `playlists_sharing_persistence`. The `playlists_sharing` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `playlists_sharing_persistence` container, which hosts a [sql database](/playlists_sharing_persistence/init.sh) that stores the following data:
 
 * A *playlist_share* table with all playlist sharing information, where the `(playlist_id, recipient_username)` pair must be unique. The recipient is the username of the recipient of the sharing action
 
