@@ -182,7 +182,7 @@ def marshal_with_flask_enforced(schema, code='default', description='', inherit=
                 content: dict = to_marshal_result.json
 
                 # Validate content to match marshalling schema
-                instance.load(content)
+                content = instance.load(content)
 
                 # Convert content to ensure marshalling happens
                 to_marshal_result.data = instance.dumps(content)
