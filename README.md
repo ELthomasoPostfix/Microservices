@@ -142,6 +142,10 @@ This microservice is split up into two docker containers: `accounts` and `accoun
 
 * A *account* table with all the `(username, password)` pairs, where the `username` must be unique
 
+Microservice dependencies:
+
+***NONE***
+
 Passwords are stored in plaintext and not encrypted, hashed or treated in any way, neither in storage not in transport. The username of a user will function as the primary, unique identifier of the user in all other microservices.
 
 ## Friends Microservice:
@@ -170,6 +174,10 @@ Implemented requirements:
 This microservice is split up into two docker containers: `friends` and `friends_persistence`. The `friends` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `friends_persistence` container, which hosts a [sql database](/friends_persistence/init.sh) that stores the following data:
 
 * A *friend* table with all the `(username, friendname)` pairs, where the `(username, friendname)` pair must be unique.
+
+Microservice dependencies:
+
+* [accounts](#accounts-microservice) - verify account resource existence during any state changing friend APIs
 
 Adding a friend is a one-way operation; it is *NOT* a binary operation. If `bob` adds `dylan` as a friend, then `dylan`'s friend list will remain unaltered. It is then still possible for `dylan` to add `bob` as a friend. The friend adding actions of either user are thus independent.
 
@@ -206,6 +214,11 @@ This microservice is split up into two docker containers: `playlists` and `playl
 
 * A *playlist* table with all playlists specific information, where the `(owner_username, title)` pair must be unique.
 * A *playlist_song* table which maps playlists to songs, where `(playlist_id, song_artist, song_title)` tuple must be unique.
+
+Microservice dependencies:
+
+* [accounts](#accounts-microservice) - verify account resource existence during any state changing playlist APIs
+* [songs](#songs-microservice) - verify song resource existence during any state changing playlist APIs
 
 Note the particular structure of the API endpoints for the playlists microservice specially. The resources that make it up are ordered as follows, from most to least coarse grained: `Playlists > Playlist`.
 
@@ -245,6 +258,13 @@ Implemented requirements:
 This microservice is split up into two docker containers: `playlists_sharing` and `playlists_sharing_persistence`. The `playlists_sharing` container pertains to the flask application logic in the form of a RESTful API. It interacts with the `playlists_sharing_persistence` container, which hosts a [sql database](/playlists_sharing_persistence/init.sh) that stores the following data:
 
 * A *playlist_share* table with all playlist sharing information, where the `(playlist_id, recipient_username)` pair must be unique. The recipient is the username of the recipient of the sharing action
+Microservice dependencies:
+
+Microservice dependencies:
+
+* [playlists](#playlists-microservice) - verify playlist resource existence during any state changing playlist sharing APIs
+* [accounts](#accounts-microservice) - verify account resource existence during any state changing playlist APIs
+
 
 The playlist sharing feature has been consciously split from the [playlists microservice](#playlists-microservice) in favour of atomicity of services. This is analogous to the [accounts microservice](#accounts-microservice) being separate from the [friends microservice](#friends-microservice), in that a consumer app can still find out which playlists have been shared with a specific user even if the [playlists microservice](#playlists-microservice) is down. Though, without access to the proper [playlists microservice](#playlists-microservice), the reponse of the playlists sharing microservice would only specify a list of `(recipient, playlist_id)` tuples. The playlist title is not also included in this microservice due to its possibly mutable nature, so as to avoid data synchronization issues.
 
