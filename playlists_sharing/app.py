@@ -46,13 +46,14 @@ class SharedPlaylists(MethodResource):
         with conn.cursor() as curs:
             curs.execute("SELECT * FROM playlist_share WHERE recipient_username = %s;", (recipient,))
             result = []
-            for recipient, playlist_id, created in curs.fetchall():
+            for recipient, playlist_id, owner, created in curs.fetchall():
                 # The basic, required data for the playlist
                 # share microservice
                 playlist_share_info = {
                         "recipient": recipient,
                         "id": playlist_id,
-                        "created": created.isoformat()
+                        "owner": owner,
+                        "created": created.isoformat(),
                 }
                 extend_share_information(playlist_share_info)
                 result.append(playlist_share_info)
@@ -97,7 +98,8 @@ class SharedPlaylist(MethodResource):
             playlist_share_info = {
                 "recipient": res[0],
                 "id": res[1],
-                "created": res[2].isoformat(),
+                "owner": res[2],
+                "created": res[3].isoformat(),
             }
             extend_share_information(playlist_share_info)
 
@@ -117,13 +119,14 @@ class SharedPlaylist(MethodResource):
         require_user_exists(recipient)
         response = require_playlist_exists(playlist_id)
 
-        if response is not None:
-            playlist = response.json()
-            if playlist.get("owner", None) == recipient:
-                return make_response_error(E_MSG.ERROR, "You cannot share a playlist with yourself", 400)
+        # Response should never be None here
+        playlist = response.json()
+        playlist_owner = playlist.get("owner", None)
+        if playlist_owner == recipient:
+            return make_response_error(E_MSG.ERROR, "You cannot share a playlist with yourself", 400)
 
         with conn.cursor() as curs:
-            curs.execute('INSERT INTO playlist_share ("recipient_username", "playlist_id") VALUES (%s, %s);', (recipient, playlist_id))
+            curs.execute('INSERT INTO playlist_share ("recipient_username", "playlist_id", "owner_username") VALUES (%s, %s, %s);', (recipient, playlist_id, playlist_owner))
             conn.commit()
 
             curs.execute('SELECT * FROM playlist_share WHERE recipient_username = %s AND playlist_id = %s;', (recipient, playlist_id))
@@ -133,7 +136,7 @@ class SharedPlaylist(MethodResource):
             if res is None:
                 return make_response_error(E_MSG.ERROR, f"Failed to share playlist with id '{playlist_id}' with recipient '{recipient}'", 500)
 
-        return make_response_message(E_MSG.SUCCESS, 200, recipient=res[0], id=res[1], created=res[2].isoformat())
+        return make_response_message(E_MSG.SUCCESS, 200, recipient=res[0], id=res[1], owner=res[2], created=res[3].isoformat())
 
 
 def extend_share_information(share_information: dict) -> None:
