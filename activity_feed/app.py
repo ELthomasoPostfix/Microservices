@@ -73,6 +73,25 @@ class ActivityFeed(MethodResource):
         playlists: list = []
         for friend_name in friends_names:
 
+            # Fetch all friends of the friend from which to construct the feed
+            try:
+                response = requests.get(f"http://friends:5000/friends/{friend_name}?amount={amount}")
+                if response.status_code == 200:
+                    activity_feed.extend([
+                        (
+                            friend_info["created"],
+                            "Added Friend",
+                            f"{friend_name} added {friend_info['friend_name']} as a friend"
+                        )
+                        for friend_info in response.json().get("result", list())
+                        if "created" in friend_info and "friend_name" in friend_info
+                    ])
+                    activity_feed = filtered_activity_feed()
+
+            # Explicitly set output values, to ensure graceful failure is handled appropriately
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                pass
+
             # Fetch friend's playlists
             try:
                 response = requests.get(f"http://playlists:5000/playlists/{friend_name}?amount{amount}")
