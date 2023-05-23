@@ -57,7 +57,7 @@ class ActivityFeed(MethodResource):
         # Fetch all friends of the user for which to construct the feed
         friends_names: list = []  # A list of all the user's friends
         try:
-            response = requests.get(f"http://friends:5000/friends/{username}?amount={amount}")
+            response = requests.get(f"http://friends:5000/friends/{username}")
             if response.status_code == 200:
                 friends_names = [
                     friend_name
@@ -75,7 +75,7 @@ class ActivityFeed(MethodResource):
 
             # Fetch all friends of the friend from which to construct the feed
             try:
-                response = requests.get(f"http://friends:5000/friends/{friend_name}?amount={amount}")
+                response = requests.get(f"http://friends:5000/friends/{friend_name}")
                 if response.status_code == 200:
                     activity_feed.extend([
                         (
@@ -94,19 +94,19 @@ class ActivityFeed(MethodResource):
 
             # Fetch friend's playlists
             try:
-                response = requests.get(f"http://playlists:5000/playlists/{friend_name}?amount{amount}")
+                response = requests.get(f"http://playlists:5000/playlists/{friend_name}")
                 if response.status_code == 200:
-                    for playlist_id in response.json().get("result", list()):
+                    for playlist in response.json().get("result", list()):
 
                         # Skip malformed
-                        if "id" not in playlist_id or "title" not in playlist_id:
+                        if "id" not in playlist or "title" not in playlist:
                             continue
 
-                        playlists.append((playlist_id["id"], playlist_id["title"]))
+                        playlists.append((playlist["id"], playlist["title"]))
                         activity_feed.append((
-                            playlist_id["created"],
+                            playlist["created"],
                             f"Playlist created",
-                            f"{friend_name} created a playlist called {playlist_id['title']}")
+                            f"{friend_name} created a playlist called {playlist['title']}")
                         )
 
                     activity_feed = filtered_activity_feed()
@@ -119,7 +119,7 @@ class ActivityFeed(MethodResource):
             for playlist_id, playlist_title in playlists:
                 # Fetch friend's playlist's songs
                 try:
-                    response = requests.get(f"http://playlists:5000/playlists/{playlist_id}?amount={amount}")
+                    response = requests.get(f"http://playlists:5000/playlists/{playlist_id}")
                     if response.status_code == 200:
                         activity_feed.extend([
                             (
@@ -136,11 +136,29 @@ class ActivityFeed(MethodResource):
                 except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
                     playlists = []
 
-            # Call playlists sharing API
-            # TODO
-            # TODO
-            # TODO
-            # TODO
+
+            # Fetch the playlist sharing information of the friend
+            try:
+                response = requests.get(f"http://playlists_sharing:5000/playlists/{friend_name}/shared?usernameIdentity=owner")
+                if response.status_code == 200:
+                    for playlist_share in response.json().get("result", list()):
+
+                        # Skip malformed
+                        if "recipient" not in playlist_share or "created" not in playlist_share or\
+                            "id" not in playlist_share or "owner" not in playlist_share:
+                            continue
+
+                        activity_feed.append((
+                            playlist_share["created"],
+                            f"Playlist Shared",
+                            f"a playlist {('called ' + playlist_share['title']) if 'title' in playlist_share else ('with id ' + playlist_share['id'])} of {playlist_share['owner']} was shared with {playlist_share['recipient']}")
+                        )
+
+                    activity_feed = filtered_activity_feed()
+
+            # Explicitly set output values, to ensure graceful failure is handled appropriately
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                pass
 
         # Format results for output
         res = [
