@@ -7,7 +7,6 @@ To skip to running the project, refer to [this section](#running-the-project).
 The following major sections relate directly to the project's required features and deliverables:
 * [Run the project](#running-the-project)
 * [Decomposition into Microservices](#decomposition-into-microservices)
-* [Documentation](#documentation)
 
 Note that the role of the manual deliverable is filled by the [Documentation](#documentation) section.
 
