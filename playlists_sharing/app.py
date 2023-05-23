@@ -46,12 +46,13 @@ class SharedPlaylists(MethodResource):
         with conn.cursor() as curs:
             curs.execute("SELECT * FROM playlist_share WHERE recipient_username = %s;", (recipient,))
             result = []
-            for recipient, playlist_id in curs.fetchall():
+            for recipient, playlist_id, created in curs.fetchall():
                 # The basic, required data for the playlist
                 # share microservice
                 playlist_share_info = {
                         "recipient": recipient,
                         "id": playlist_id,
+                        "created": created.isoformat()
                 }
                 extend_share_information(playlist_share_info)
                 result.append(playlist_share_info)
@@ -95,7 +96,8 @@ class SharedPlaylist(MethodResource):
 
             playlist_share_info = {
                 "recipient": res[0],
-                "id": res[1]
+                "id": res[1],
+                "created": res[2].isoformat(),
             }
             extend_share_information(playlist_share_info)
 
@@ -131,7 +133,7 @@ class SharedPlaylist(MethodResource):
             if res is None:
                 return make_response_error(E_MSG.ERROR, f"Failed to share playlist with id '{playlist_id}' with recipient '{recipient}'", 500)
 
-        return make_response_message(E_MSG.SUCCESS, 200, recipient=res[0], id=res[1])
+        return make_response_message(E_MSG.SUCCESS, 200, recipient=res[0], id=res[1], created=res[2].isoformat())
 
 
 def extend_share_information(share_information: dict) -> None:
@@ -161,7 +163,8 @@ def extend_share_information(share_information: dict) -> None:
             return
         response_json = response.json()
         share_information.update({
-            "title": response_json.get("title", "")
+            "title": response_json.get("title", ""),
+            "playlist_created": response_json.get("created", "")
         })
     except (DoesNotExist, MicroserviceConnectionError):
         pass

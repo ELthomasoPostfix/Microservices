@@ -9,7 +9,7 @@ class FriendSchema(Schema):
         'description': 'The username of the friend/receiver (target) of the friend relation',
     })
     created = fields.DateTime(format="iso", required=True, metadata={
-        'description': 'The ISO8601 date time at which the song was added to the playlist'
+        'description': 'The ISO8601 date time at which the friendship relationship was started'
     })
 
 

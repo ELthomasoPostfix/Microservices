@@ -10,6 +10,9 @@ class SharedPlaylistSchema(Schema):
     recipient = fields.String(required=True, metadata={
         'description': 'The username of the recipient user of the playlist sharing action',
     })
+    created = fields.DateTime(format="iso", required=True, metadata={
+        'description': 'The ISO8601 date time at which the playlist was shared'
+    })
 
 
 class SharedPlaylistExtendedSchema(SharedPlaylistSchema):
@@ -20,6 +23,9 @@ class SharedPlaylistExtendedSchema(SharedPlaylistSchema):
     """
     title = fields.String(required=False, default="N/A", metadata={
         'description': 'The user-designated title of the playlist',
+    })
+    playlist_created = fields.DateTime(format="iso", required=False, metadata={
+        'description': 'The ISO8601 date time at which the playlist was created'
     })
 
 
