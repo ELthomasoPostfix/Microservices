@@ -57,26 +57,31 @@ The following are additional notes on project submission
 * Be sure that the Docker images you make will function on another computer.
 * Late submissions will automatically have points deducted for tardiness.
 * Make sure that your submission has the following format and upload it via Blackboard! 
-    <br><b>DS-Assignment1-Snumber-Lastname.zip</b>
+    <br><b>DS-Assignment2-Snumber-Lastname.zip</b>
 
 # Running the project
 
-// TODO: Add run section
+The project code is contained entirely withing docker containers. This means that the provided [run script](/run.sh) can be used to simply run the project. Do not that the run script rebuilds the containers, so rerunning the project by calling the run script as is might take a while.
+
+```sh
+./run.sh
+```
 
 # Decomposition into Microservices
 
-The following sections detail the decomposition of the project description into atomary microservices. But first, they are precluded by short descriptions of the available swagger documentation and some notes on graceful failure of microservices.
+The following sections detail the decomposition of the project description into atomary microservices. Each decomposition section will also specify a table that specifies where the project requirements were implemented, which RESTful resource implements them. This table does not detail all possible endpoints. For a detailed list, refer to the collection of swagger doc pages. Without further ado, some short descriptions of the available swagger documentation and some notes on graceful failure of microservices.
 
 ## Swagger Docs
 
 Each microservice exposes interactive swagger documentation for its own RESTful API. Thus, the docs are not accessible through one single URL. Below is a list of URLs that should provide access to the swagger-ui docs for the implemented microservices, **once the microservices are running**, for easy access. But, each microservice should also specify their own doc urls in their decomposition section.
 
-| Microservice      | url                               |
+| Microservice      | swagger-ui url                    |
 | -                 | -                                 |
 | [accounts](#accounts-microservice)          | http://127.0.0.1:5002/swagger-ui/ |
 | [friends](#friends-microservice)           | http://127.0.0.1:5003/swagger-ui/ |
 | [playlists](#playlists-microservice)         | http://127.0.0.1:5004/swagger-ui/ |
 | [playlists sharing](#playlists-sharing-microservice) | http://127.0.0.1:5005/swagger-ui/ |
+| [activity feed](#activity-feed-microservice) | http://127.0.0.1:5006/swagger-ui/ |
 
 ## Graceful Failure
 
@@ -117,7 +122,7 @@ Lastly, note that the `gui` flask app also implements this second precaution, as
 
 ## Songs Microservice:
 
-The songs microservice was provided to us at the start of the assignment. It stores artist-title combinations that represent songs.
+The songs microservice was provided to us as an example component of the assignment. It stores artist-title combinations that represent songs.
 
 ## Accounts Microservice:
 
@@ -272,32 +277,100 @@ Microservice dependencies:
 
 The playlist sharing feature has been consciously split from the [playlists microservice](#playlists-microservice) in favour of atomicity of services. This is analogous to the [accounts microservice](#accounts-microservice) being separate from the [friends microservice](#friends-microservice), in that a consumer app can still find out which playlists have been shared with a specific user even if the [playlists microservice](#playlists-microservice) is down. Though, without access to the proper [playlists microservice](#playlists-microservice), the reponse of the playlists sharing microservice would only specify a list of `(recipient, playlist_id)` tuples. The playlist title is not also included in this microservice due to its possibly mutable nature, so as to avoid data synchronization issues.
 
+Note that the collection endpoint of shared playlists requires the caller to specify a `usernameIdentity` query parameter, with possible values `owner` and `recipient`. This parameter allow the caller to choose if the playlist share resources that are returned should be the ones "shared by" or "shared with" the specified username repectively. 
+
 The following two paragraphs explain the soft dependency of the playlist sharing microservice on the [playlists microservice](#playlists-microservice) in the context of attaching the playlist title to each shared playlist in the response.
 
 Of note is that the GET operations of the playlists sharing microservice will attempt to query the [playlists microservice](#playlists-microservice) to enrich their own responses. Consider the database contents of playlists sharing, which stores the minimally required sharing information: The recipient username and the playlist id. However, if the list of (or one singular) shared playlists is requested, it is likely that the caller also wants the corresponding playlist meta information, such as the playlist title. Hence the playlists sharing microservice always attempts to fetch the meta info for each shared playlist part of the GET responses; it somewhat acts as a proxy for the [playlists microservice](#playlists-microservice), except that works with shared playlists only.
 
 However, failing a fetch to the [playlists microservice](#playlists-microservice) is not seen as catastrophic. This simply means that for the failing playlist, only the basic sharing information found in the playlist sharing microservice itself is returned. Furthermore, the responses of the [playlists microservice](#playlists-microservice) are *NOT* used to validate whether the contents of the playlists sharing microservice database are valid. Suppose that the sharing database contains a row `('bob', 4)`, meaning playlist `4` was shared with user `bob`. If the [playlists microservice](#playlists-microservice) returns a `404 Not Found` for that playlist, then the playlist sharing microservice does not consider the implications for its data validity. Only simple inquiry success VS failure is considered for the purpose of populating the response with the fetched meta info in addition to the basic information it always responds with. That basic info being playlist id and recipient username.
 
-Microservice E:
+## Activity Feed Microservice:
 
-* Each user has a feed that lists the last N activities of its friends. (sorted
+Swagger docs urls:
+
+* http://127.0.0.1:5006/swagger-ui/
+* http://127.0.0.1:5006/swagger/
+
+Implemented requirements:
+
+9. Each user has a feed that lists the last N activities of its friends. (sorted
 by time) Activities are :
    1. creating a playlist,
    2. adding a song to a playlist,
    3. making a friend
    4. sharing a playlist with a friend.
 
-# Documentation
+<details style="background: #3B3B3B; padding: 10px; border-radius: 1rem;">
+  <summary>Detailed Implemented Requirements</summary>
 
-// TODO: Add docs section
+| Project Req Nr | API Resource class | HTTP method | URI |
+| :-:  | :-: | :-: | :- |
+| 9.   | [ActivityFeed](/activity_feed/app.py) | GET | /activity-feed/\<username> |
 
-# Encountered Techinical Difficulties
+</details>
+<br>
+
+This microservice consists of only a single docker container: `activity_feed`. The `activity_feed` container pertains to the flask application logic in the form of a RESTful API. It acts as a proxy for the other microservices that store the data needed to compile an activity feed for a user.
+
+Microservice dependencies:
+
+* [playlists](#playlists-microservice) - pull the playlist creation and extension data records
+* [playlists sharing](#playlists-sharing-microservice) - pull the playlist sharing data records
+* [friends](#friends-microservice) - pull the friend addition data records
+
+The actvity feed is its own separate service due to its dependence on many other services. Even if one of the dependencies fails or goes down, the feed can simply be padded with more results of the still correctly operating others. This results in increased robustness and availability of the feed as a service; the only way for the feed to become completely unavailable is for the feed service itself to go down.
+
+The activity feed currently works as a proxy for a combination of services provided by the [friends](#friends-microservice), the [playlists](#playlists-microservice) and the [playlists sharing](#playlists-sharing-microservice) microservices. The activity feed is reconstructed by re-fetching all data from every depended on service each time the activity feed API is called. This implementation was chosen mostly for simplicity's sake.
+
+One benefit of polling data versus receiving updates, is that the downtime of the activity feed microservice does not result in lost update messages under any circumstance. Other services do not need to verify or expect that the feed service is online or even exists. So no message queueing or anything of the sort is required. One downside in a realistic implementation would be that all depended on microservices ***must*** partially support some filtering functionality. That is, the storing of data record creation date and the sorting of output data by the creation date is required. The limiting of the number of output records is also expected. Else, the feed cannot efficiently poll the depended on microservice. **However**, in my implementation ***none*** of the endpoints support the sorting of output by date ***nor*** do they support limiting the amount of output entries. The activity feed microservice simply polls *all* of the data it needs contained in a depended on microservice, then sorts the results itself before limiting the feed to the desired length. This is done mostly for my own convenience.
+
+Another reason I chose for a poll implementation is that I endeavoured to keep as much activity feed logic out of the other microservices as possible. It does not make sense to separate it as a service, to then let its implementation bleed into the design of other microservices anyways.
+
+Note that, these downsides &#8213; the depended on microservices needing to implement sorting by creation date and limiting the number of results &#8213; are still logical extensions of the RESTful API functionality already present in the depended on microservices. Becauses individual resources are often part of a collection, the collection API should expose ways to retrieve (parts of) it. Adding limited filtering functionality, is reasonable functionality to add to the collection endpoints.
+
+The following paragraphs do not reflect the current implementation, but serve to illustrate designs considerations.
+
+Consider the following extension to the activity feed microservice. Suppose that the Activity feed microservice were to store all the activity information in a separate `activity_feed_persistence` container. Then extraneous calls to the depended on microservices could be avoided. The activity feed would also depend on the other services to a lesser degree. If one of the services providing the feed with data were to go down, then the feed could still serve the stored activity records. This does mean the feed service would be required to periodically update its stored activity records; it should pull new activity data from the data source microservices every once in a while. Another problem with this approach is data duplication. It is less so a problem that more storage is required and more a question of how data updates in the depended on services should be propagated to the stored activity feed records. Though, this is somewhat outside the project scope.
+
+Why was the feed implemented as polling data from dependencies and not as the dependencies pushing updates to the activity feed? An initial, naive approach would be to simply hard-code each dependeded on service to push any database insert, delete and update to the feed microservice. The downside however, is that if the feed service were to go down or crash, then any updates during the downtime are lost and non-recoverable. It would be possible to resolve this to always (asynchronously) await a positive answer to the update, and else queue the update for later retries of the push. This makes each individual service more bloated with "networking code" and would be overkill for this assignment.
+
+An entirely different approach to the feed service would use a Pub/Sub approach of insert, update and delete notification. This would again be overly complicated for the assignment. Ideally, the Pub/Sub would be a separate, generalized service that handles only Pub/Sub. This would offload the task of ensuring message delivery to the separate service, and would solve the problem of missed messages by the feed service during its own downtime. This would also make the feed more easily extensible, as any new microservice could notify the Pub/Sub service of updates. The feed service could then simply subscribe to the new topic and extend the feed content to include the new data. But again, slightly overkill. A slight problem could be that any messages pushed to the Pub/Sub and that were discarded before the feed service existed, sould not be possible to add to the extended feed's database. Polling does not have this problem.
+
+# Encountered Technical Difficulties
+
+# Marshmallow
+
+Marshmallow handles marshalling via schemas and their load and dump methods. All marshalling in marshmallow is strict, meaning that type mismatches or other such violations are disallowed and result in an error. However, it is important to note that validation of data should be done before marshalling can take place. The following is the proper way, as per the documentation, to validate data before marshalling:
+
+```py
+from marshmallow import fields, Schema, ValidationError
+from datetime import datetime
+
+class MyDateSchema(Schema):
+    created = fields.DateTime(format="iso", required=True, metadata={
+        'description': "The time some record was created"
+    })
+
+instance = MyDateSchema()
+data = { "created": datetime.now() }    # Should be ISO string, call .isoformat() on it
+try:
+    # The validate method transforms the data,
+    # AND performs data validation
+    # --> raises exception if malformed
+    validated = instance.load(data)     # Raises exception, the date should be an ISO string
+except ValidationError as e:
+    print("ERROR: ", e)
+
+to_marshall_data = instance.dump(validated)
+print(to_marshall_data)
+```
 
 ## APISpec
 
 ### Swagger VS APISpec Config
 
-The automatically generated API docs work based off of the `flask-apispec` python module. This module generates swagger documentation and serves an interactive instance of it at the specified endpoint. However, problems occur if you specifically configure your `flask` application with APISpec config. Take for example the following standalone code:
+The API docs are automatically generated using the `flask-apispec` python module. This module generates swagger documentation and serves an interactive instance of it at the specified endpoint. However, problems occur if you specifically configure your `flask` application with APISpec config. Take for example the following standalone code:
 
 ```py
 from flask import Flask
