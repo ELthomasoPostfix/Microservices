@@ -33,6 +33,18 @@ def feed():
 
     if username is not None:
         feed = []  # TODO: call
+        try:
+            response = requests.get(f"http://activity_feed:5000/feeds/{username}?amount={N}")
+            if response.status_code == 200:
+                feed = [
+                    (activity["date"], activity["title"], activity["description"])
+                    for activity in response.json().get("result", [])
+                    if "date" in activity and "title" in activity and "description" in activity
+                ]
+        # Explicitly set output values, to ensure graceful failure is handled appropriately
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            feed = []
+
     else:
         feed = []
 
@@ -220,7 +232,7 @@ def playlists():
             my_playlists = []
 
         try:
-            response = requests.get(f"http://playlists_sharing:5000/playlists/{username}/shared")
+            response = requests.get(f"http://playlists_sharing:5000/playlists/{username}/shared?usernameIdentity=recipient")
             if response.status_code == 200:
                 shared_playlists = response.json().get("result", list())
                 shared_with_me = [
