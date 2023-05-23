@@ -122,6 +122,15 @@ services:
     depends_on:
       - playlists_sharing_persistence
 
+  activity_feed:
+    build:
+      context: .
+      dockerfile: ./activity_feed/
+    volumes:
+      - ./shared/:/shared:ro
+    ports:
+      - 5006:5000
+
   gui:
     build: ./gui
     ports:
