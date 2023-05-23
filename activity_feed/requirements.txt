@@ -1,0 +1,7 @@
+Flask==2.2.3
+Flask-RESTful==0.3.9
+Flask-apispec==0.11.4
+requests
+
+# Unused but required imports
+psycopg2-binary     # Must be included due to its use in shared utils
