@@ -1,6 +1,7 @@
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, validate
 
 from shared.schemas import MicroservicesResponseSchema, MicroservicesResultSchema
+
 
 class SharedPlaylistSchema(Schema):
     """The Playlist resource's sharing information"""
@@ -43,3 +44,9 @@ class SharedPlaylistsResponseSchema(MicroservicesResultSchema):
     result = fields.List(fields.Nested(SharedPlaylistExtendedSchema), required=True, default=[], metadata={
         'description': 'The list of playlists shared with a recipient user',
     })
+
+
+class SharedPlaylistQuerySchema(Schema):
+    usernameIdentity = fields.String(required=True, location='query', metadata={
+        'description': 'The party/identity of the playlist share relation that the username parameter refers to.',
+    }, validate=validate.OneOf(['owner', 'recipient']))

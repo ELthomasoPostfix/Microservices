@@ -1,11 +1,11 @@
-from flask_apispec import MethodResource, doc
+from flask_apispec import MethodResource, doc, use_kwargs
 from psycopg2.errors import UniqueViolation, OperationalError, InterfaceError
 
 from shared.utils import initialize_micro_service, marshal_with_flask_enforced
 from shared.microserviceInteractions import require_user_exists, require_playlist_exists
 from shared.exceptions import DoesNotExist, MicroserviceConnectionError, get_409_already_exists, get_404_does_not_exist, get_500_database_error, get_502_bad_gateway_error
 from shared.APIResponses import GenericResponseMessages as E_MSG, make_response_error, make_response_message
-from schemas import SharedPlaylistsResponseSchema, SharedPlaylistResponseSchema
+from schemas import SharedPlaylistsResponseSchema, SharedPlaylistResponseSchema, SharedPlaylistQuerySchema
 
 
 MICROSERVICE_NAME = "playlists_sharing"
@@ -20,31 +20,43 @@ app, api, docs, conn = initialize_micro_service(MICROSERVICE_NAME, DB_HOST, APIS
 
 
 class SharedPlaylists(MethodResource):
-    """The api endpoint that represents a collection of Playlist resources shared with a recipient user.
+    """The api endpoint that represents a collection of Playlist resources shared with a recipient user or shared by an owner user.
 
-    This resource collection does not support any project requirements directly,
-    it ensures RESTfulness by making the URL hackable up the tree.
+    This resource supports the following project requirements
+        9.4. displaying playlist shares in the feed
+    It also ensures RESTfulness by making the URL hackable up the tree.
     """
     @staticmethod
     def route() -> str:
-        """Get the route to the collection Playlist resources shared with a recipient user.
+        """Get the route to the collection Playlist resources shared with a recipient user or shared by an owner user.
 
         :return: The route string
         """
-        return "/playlists/<string:recipient>/shared"
+        return "/playlists/<string:username>/shared"
 
-    @doc(description='Get the collection of Playlist resources shared with a specified recipient user. This endpoint will attempt to query the playlists microservice to add additional, optional information to each playlist share in its response.', params={
-        'recipient': {'description': 'The username of the recipient user to fetch the list of shared with playlists of'},
+    @doc(description='Get the collection of Playlist resources that were shared. Retrieve the resources by specifying either the recipient or owner. This endpoint will attempt to query the playlists microservice to add additional, optional information to each playlist share in its response. It is possible to query the playlists shared with or shared by the specified user. Using \'recipient\' results in all playlists shared with the username. Using \'owner\' results in all playlists shared with username as the owner.', params={
+        'username': {'description': 'The username of the party to fetch the playlist shares for.'},
     })
+    @use_kwargs(SharedPlaylistQuerySchema, location="query")
     @marshal_with_flask_enforced(SharedPlaylistsResponseSchema, code=200)
-    def get(self, recipient: str):
+    def get(self, username: str, **kwargs):
         """The query endpoint of the collection of shared Playlist resources for a recipient user.
 
         :return: The list of playlists shared with the recipient user
         """
 
+        shareParty: str = kwargs["usernameIdentity"]
+
         with conn.cursor() as curs:
-            curs.execute("SELECT * FROM playlist_share WHERE recipient_username = %s;", (recipient,))
+            share_party_col_name: str = ""
+            if shareParty == "recipient":
+                share_party_col_name = "recipient_username"
+            elif shareParty == "owner":
+                share_party_col_name = "owner_username"
+            else:
+                return make_response_error(E_MSG.ERROR, f"Invalid value for shareParty query parameter: {shareParty}", 400)
+
+            curs.execute(f"SELECT * FROM playlist_share WHERE {share_party_col_name} = %s;", (username,))
             result = []
             for recipient, playlist_id, owner, created in curs.fetchall():
                 # The basic, required data for the playlist
@@ -76,24 +88,24 @@ class SharedPlaylist(MethodResource):
         return f"{SharedPlaylists.route()}/<int:playlist_id>"
 
     @doc(description='Get the sharing information for a Playlist resource with a specified recipient user. This endpoint will attempt to query the playlists microservice to add additional, optional information to its response.', params={
-        'recipient': {'description': 'The username of the recipient user to fetch the specific playlist sharing information for'},
+        'username': {'description': 'The username of the recipient user to fetch the specific playlist sharing information for'},
         'playlist_id': {'description': 'The unique identifier of the playlist to fetch the sharing information for'},
     })
     @marshal_with_flask_enforced(SharedPlaylistResponseSchema, code=200)
-    def get(self, recipient: str, playlist_id: int):
+    def get(self, username: str, playlist_id: int):
         """The query endpoint of the single Playlist resource's sharing information for a specified recipient user.
 
         :return: The sharing information for the playlist and the recipient user
         """
 
         with conn.cursor() as curs:
-            curs.execute("SELECT * FROM playlist_share WHERE recipient_username = %s AND playlist_id = %s;", (recipient, playlist_id))
+            curs.execute("SELECT * FROM playlist_share WHERE recipient_username = %s AND playlist_id = %s;", (username, playlist_id))
             res = curs.fetchone()
 
             # DoesNotExist exception response is handled
             # by DoesNotExist error handler
             if res == None:
-                raise DoesNotExist(f"no playlist with id '{playlist_id}' is shared with recipient '{recipient}'")
+                raise DoesNotExist(f"no playlist with id '{playlist_id}' is shared with recipient '{username}'")
 
             playlist_share_info = {
                 "recipient": res[0],
@@ -106,35 +118,35 @@ class SharedPlaylist(MethodResource):
         return make_response_message(E_MSG.SUCCESS, 200, **playlist_share_info)
 
     @doc(description='Share a Playlist resource with a specified recipient user.', params={
-        'recipient': {'description': 'The username of the recipient user to share the specific playlist with'},
+        'username': {'description': 'The username of the recipient user to share the specific playlist with'},
         'playlist_id': {'description': 'The unique identifier of the playlist to share'},
     })
     @marshal_with_flask_enforced(SharedPlaylistResponseSchema, code=200)
-    def post(self, recipient: str, playlist_id: int):
+    def post(self, username: str, playlist_id: int):
         """The creation endpoint of the single Playlist resource's sharing information for a specified recipient user.
 
         :return: The created sharing information for the playlist and the recipient user
         """
 
-        require_user_exists(recipient)
+        require_user_exists(username)
         response = require_playlist_exists(playlist_id)
 
         # Response should never be None here
         playlist = response.json()
         playlist_owner = playlist.get("owner", None)
-        if playlist_owner == recipient:
+        if playlist_owner == username:
             return make_response_error(E_MSG.ERROR, "You cannot share a playlist with yourself", 400)
 
         with conn.cursor() as curs:
-            curs.execute('INSERT INTO playlist_share ("recipient_username", "playlist_id", "owner_username") VALUES (%s, %s, %s);', (recipient, playlist_id, playlist_owner))
+            curs.execute('INSERT INTO playlist_share ("recipient_username", "playlist_id", "owner_username") VALUES (%s, %s, %s);', (username, playlist_id, playlist_owner))
             conn.commit()
 
-            curs.execute('SELECT * FROM playlist_share WHERE recipient_username = %s AND playlist_id = %s;', (recipient, playlist_id))
+            curs.execute('SELECT * FROM playlist_share WHERE recipient_username = %s AND playlist_id = %s;', (username, playlist_id))
             res = curs.fetchone()
 
             # Echo back playlist share meta info to caller,
             if res is None:
-                return make_response_error(E_MSG.ERROR, f"Failed to share playlist with id '{playlist_id}' with recipient '{recipient}'", 500)
+                return make_response_error(E_MSG.ERROR, f"Failed to share playlist with id '{playlist_id}' with recipient '{username}'", 500)
 
         return make_response_message(E_MSG.SUCCESS, 200, recipient=res[0], id=res[1], owner=res[2], created=res[3].isoformat())
 
