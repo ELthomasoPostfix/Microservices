@@ -5,7 +5,7 @@ from flask_restful import Api, reqparse
 from flask_apispec import FlaskApiSpec, marshal_with
 from marshmallow import Schema, ValidationError
 from json import JSONDecodeError
-from typing import Tuple, Callable
+from typing import Tuple, Callable, Union
 
 from shared.APIResponses import make_response_error, GenericResponseMessages as E_MSG
 
@@ -55,20 +55,29 @@ def retry_connect_until_success(db_name: str, user: str, password: str, host: st
             print("Retrying DB connection")
 
 
-def initialize_micro_service(microservice_name: str, db_host: str, apispec_config: dict):
+def initialize_micro_service(microservice_name: str, db_host: Union[str, None], apispec_config: dict):
     """Perform the necessary setup to initialize a micro service.
 
     :param microservice_name: The name of the microservice. Used to
     determine the Flask app name and postgresql database name
-    :param db_host: The database host address
-    :return: The major components of the microservice
+    :param db_host: The database host address, make connection with a
+    persistence container if not None
+    :return: The major components of the microservice: (
+        Flask app,
+        Flask RESTful api,
+        FlaskApiSpec docs,
+        psycopg2 connection
+    )
     """
     app, api, docs = create_app(microservice_name, apispec_config)
 
-    conn = retry_connect_until_success(db_name=microservice_name,
-                                   user=app.config["POSTGRES_USER"],
-                                   password=app.config["POSTGRES_PASSWORD"],
-                                   host=db_host)
+    conn = None
+    if db_host is not None:
+        conn = retry_connect_until_success(db_name=microservice_name,
+                                    user=app.config["POSTGRES_USER"],
+                                    password=app.config["POSTGRES_PASSWORD"],
+                                    host=db_host)
+
     return app, api, docs, conn
 
 
