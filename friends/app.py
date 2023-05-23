@@ -47,9 +47,10 @@ class Friends(MethodResource):
             curs.execute("SELECT * FROM friend WHERE username = %s;", (username,))
             res = [
                 {
-                    "friend_name": friend_name
+                    "friend_name": friend_name,
+                    "created": created.isoformat(),
                 }
-                for _, friend_name in curs.fetchall()
+                for _, friend_name, created in curs.fetchall()
             ]
 
         return make_response_message(E_MSG.SUCCESS, 200, result=res)
@@ -89,7 +90,7 @@ class Friend(MethodResource):
         if res == None:
             raise DoesNotExist(f"the user '{username}' has not added the user '{friendname}' as a friend")
 
-        return make_response_message(E_MSG.SUCCESS, 200, friend_name=res[1])
+        return make_response_message(E_MSG.SUCCESS, 200, friend_name=res[1], created=res[2].isoformat())
 
     @doc(description='Create a single Friend resource, which represents a friend relation between two users.', params={
         'username': {'description': 'The username of the sender (initiator) of the friend relation'},

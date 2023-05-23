@@ -8,6 +8,9 @@ class FriendSchema(Schema):
     friend_name = fields.String(required=True, metadata={
         'description': 'The username of the friend/receiver (target) of the friend relation',
     })
+    created = fields.DateTime(format="iso", required=True, metadata={
+        'description': 'The ISO8601 date time at which the song was added to the playlist'
+    })
 
 
 class FriendResponseSchema(MicroservicesResponseSchema, FriendSchema):
